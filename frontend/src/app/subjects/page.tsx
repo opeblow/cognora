@@ -6,7 +6,7 @@ import { useQuery } from "@tanstack/react-query"
 import { useAuthStore } from "@/store/auth"
 import { subjectService } from "@/services/subjects"
 import { Sidebar } from "@/components/layout/sidebar"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { BookOpen } from "lucide-react"
 import Link from "next/link"
@@ -26,10 +26,11 @@ export default function SubjectsPage() {
     if (!isAuthenticated) router.push("/login")
   }, [isAuthenticated, router])
 
-  const { data } = useQuery({
+  const { data, isLoading } = useQuery({
     queryKey: ["subjects"],
     queryFn: () => subjectService.getAll(),
     enabled: isAuthenticated,
+    staleTime: 10 * 60 * 1000,
   })
 
   if (!isAuthenticated) return null
@@ -49,7 +50,22 @@ export default function SubjectsPage() {
             Choose a subject to start learning
           </p>
 
-          <div className="mt-8 space-y-10">
+          {isLoading && (
+          <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+              <Card key={i} className="animate-pulse">
+                <CardContent className="p-6">
+                  <div className="h-12 w-12 rounded-lg bg-gray-100" />
+                  <div className="mt-4 h-5 w-32 rounded bg-gray-100" />
+                  <div className="mt-2 h-4 w-48 rounded bg-gray-100" />
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+
+        {!isLoading && (
+        <div className="mt-8 space-y-10">
             {subjectsByCategory.map((category) => (
               <div key={category.value}>
                 <h2 className="text-lg font-semibold text-[#0F172A]">
@@ -90,6 +106,7 @@ export default function SubjectsPage() {
               </div>
             ))}
           </div>
+        )}
         </div>
       </main>
     </div>

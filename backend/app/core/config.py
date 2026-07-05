@@ -1,5 +1,5 @@
 from pathlib import Path
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import List
 
 
@@ -8,18 +8,19 @@ class Settings(BaseSettings):
     APP_VERSION: str = "1.0.0"
     DEBUG: bool = False
 
-    DATABASE_URL: str = "postgresql://cognora:cognora@localhost:5432/cognora"
-    REDIS_URL: str = "redis://localhost:6379/0"
+    DATABASE_URL: str = ""
+    REDIS_URL: str = ""
 
-    SECRET_KEY: str = "change-this-in-production"
+    SECRET_KEY: str = ""
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
     GOOGLE_CLIENT_ID: str = ""
     GOOGLE_CLIENT_SECRET: str = ""
-    GOOGLE_REDIRECT_URI: str = "http://localhost:8000/api/auth/google/callback"
+    GOOGLE_REDIRECT_URI: str = ""
 
+    APP_URL: str = ""
     SMTP_HOST: str = "smtp.gmail.com"
     SMTP_PORT: int = 587
     SMTP_USER: str = ""
@@ -29,16 +30,55 @@ class Settings(BaseSettings):
     BRAVE_API_KEY: str = ""
 
     OPENAI_API_KEY: str = ""
-    OPENAI_MODEL: str = "gpt-4"
+    OPENAI_MODEL: str = "gpt-4o-mini"
 
     CORS_ORIGINS: List[str] = ["http://localhost:3000"]
 
     FREE_WEEKLY_CREDITS: int = 50
     RATE_LIMIT_PER_MINUTE: int = 60
 
-    class Config:
-        env_file = Path(__file__).parent.parent.parent.parent / ".env"
-        env_file_encoding = "utf-8"
+    UPLOAD_DIR: str = "uploads"
+    MAX_UPLOAD_SIZE_MB: int = 50
+    ALLOWED_UPLOAD_TYPES: list[str] = [
+        "application/pdf",
+        "image/jpeg",
+        "image/png",
+        "image/webp",
+        "audio/webm",
+        "audio/mp3",
+        "audio/wav",
+        "audio/mp4",
+        "audio/ogg",
+        "audio/x-m4a",
+    ]
+
+    WHISPER_MODEL: str = "whisper-1"
+    AUDIO_MAX_DURATION_SECONDS: int = 300
+
+    PAYSTACK_SECRET_KEY: str = ""
+    PAYSTACK_PUBLIC_KEY: str = ""
+
+    LIVE_SESSION_PROVIDER: str = "mock"
+    HUNDREDMS_API_KEY: str = ""
+    HUNDREDMS_API_SECRET: str = ""
+    AGORA_APP_ID: str = ""
+    AGORA_APP_CERTIFICATE: str = ""
+
+    SENTRY_DSN: str = ""
+    DB_POOL_SIZE: int = 20
+    DB_MAX_OVERFLOW: int = 40
+
+    model_config = SettingsConfigDict(
+        env_file=Path(__file__).parent.parent.parent.parent / ".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
+
+    def validate_secret_key(self) -> str:
+        if not self.SECRET_KEY or self.SECRET_KEY == "change-this-to-a-random-secret-key-in-production":
+            import warnings
+            warnings.warn("SECRET_KEY is not set or is using the default value. Set a strong random secret in production.")
+        return self.SECRET_KEY
 
 
 settings = Settings()

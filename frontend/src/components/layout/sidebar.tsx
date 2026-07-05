@@ -15,6 +15,10 @@ import {
   CreditCard,
   Settings,
   LogOut,
+  RotateCcw,
+  Users,
+  Video,
+  Mic,
 } from "lucide-react"
 
 const navItems = [
@@ -23,7 +27,11 @@ const navItems = [
   { href: "/ai-tutor", label: "AI Tutor", icon: Brain },
   { href: "/quizzes", label: "Quizzes", icon: FileQuestion },
   { href: "/exams", label: "Mock Exams", icon: GraduationCap },
+  { href: "/flashcards", label: "Flashcards", icon: RotateCcw },
   { href: "/study-planner", label: "Study Planner", icon: Sparkles },
+  { href: "/lobbies", label: "Study Groups", icon: Users },
+  { href: "/live", label: "Live Teaching", icon: Video },
+  { href: "/record", label: "Audio Recording", icon: Mic },
   { href: "/analytics", label: "Analytics", icon: BarChart3 },
   { href: "/credits", label: "Credits", icon: CreditCard },
   { href: "/settings", label: "Settings", icon: Settings },

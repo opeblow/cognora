@@ -1,6 +1,7 @@
 import uuid
 from datetime import datetime, timezone, timedelta
 from sqlalchemy.orm import Session
+from app.core.config import settings
 from app.core.security import hash_password, verify_password, create_access_token, create_refresh_token, decode_token
 from app.repositories.user import UserRepository, EmailVerificationRepository, PasswordResetRepository
 from app.models.user import User
@@ -46,6 +47,7 @@ class AuthService:
         return {
             "access_token": access_token,
             "refresh_token": refresh_token,
+            "token_type": "bearer",
             "user": {
                 "id": str(user.id),
                 "email": user.email,
@@ -76,6 +78,7 @@ class AuthService:
         return {
             "access_token": access_token,
             "refresh_token": refresh_token,
+            "token_type": "bearer",
             "user": {
                 "id": str(user.id),
                 "email": user.email,
@@ -92,7 +95,7 @@ class AuthService:
         if not verification or verification.is_used:
             raise ValueError("Invalid or expired verification token")
 
-        if verification.expires_at < datetime.now(timezone.utc):
+        if verification.expires_at.replace(tzinfo=timezone.utc) < datetime.now(timezone.utc):
             raise ValueError("Verification token expired")
 
         verification.is_used = True
@@ -100,6 +103,7 @@ class AuthService:
         if user:
             user.is_verified = True
         self.db.commit()
+
         return True
 
     def forgot_password(self, email: str) -> bool:
@@ -124,7 +128,7 @@ class AuthService:
         if not reset or reset.is_used:
             raise ValueError("Invalid or expired reset token")
 
-        if reset.expires_at < datetime.now(timezone.utc):
+        if reset.expires_at.replace(tzinfo=timezone.utc) < datetime.now(timezone.utc):
             raise ValueError("Reset token expired")
 
         reset.is_used = True
@@ -144,10 +148,24 @@ class AuthService:
         if not user or not user.is_active:
             raise ValueError("User not found or inactive")
 
+        jti = payload.get("jti")
+        if jti and settings.REDIS_URL:
+            try:
+                import redis as redis_mod
+                r = redis_mod.from_url(settings.REDIS_URL, socket_connect_timeout=2, socket_timeout=2)
+                consumed = r.get(f"jti:{jti}")
+                if consumed:
+                    r.close()
+                    raise ValueError("Refresh token has been revoked")
+                r.setex(f"jti:{jti}", settings.REFRESH_TOKEN_EXPIRE_DAYS * 86400, "consumed")
+                r.close()
+            except Exception:
+                pass
+
         access_token = create_access_token({"sub": str(user.id), "email": user.email})
         new_refresh_token = create_refresh_token({"sub": str(user.id), "type": "refresh"})
 
-        return {"access_token": access_token, "refresh_token": new_refresh_token}
+        return {"access_token": access_token, "refresh_token": new_refresh_token, "token_type": "bearer"}
 
     def change_password(self, user_id: str, current_password: str, new_password: str) -> bool:
         user = self.user_repo.get(user_id)
@@ -161,8 +179,11 @@ class AuthService:
         self.db.commit()
         return True
 
-    def get_google_auth_url(self) -> str:
+    @staticmethod
+    def get_google_auth_url() -> str:
         from urllib.parse import urlencode
+        if not settings.GOOGLE_CLIENT_ID or not settings.GOOGLE_REDIRECT_URI:
+            raise ValueError("Google OAuth is not configured")
         params = {
             "client_id": settings.GOOGLE_CLIENT_ID,
             "redirect_uri": settings.GOOGLE_REDIRECT_URI,
@@ -240,6 +261,7 @@ class AuthService:
         return {
             "access_token": jwt_access,
             "refresh_token": jwt_refresh,
+            "token_type": "bearer",
             "user": {
                 "id": str(user.id),
                 "email": user.email,

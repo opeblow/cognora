@@ -9,6 +9,24 @@ class SubjectStat(BaseModel):
     quizzes_taken: int
     average_score: float
     total_study_time_minutes: int
+    mastery_percentage: Optional[float] = None
+
+
+class SubjectMastery(BaseModel):
+    subject_id: str
+    subject_name: str
+    mastery_percentage: float
+    breakdown: dict
+    quizzes_attempted: int
+    lessons_completed: int
+    study_completion_percentage: float
+
+
+class PerformanceTrend(BaseModel):
+    date: str
+    quiz_score: Optional[float] = None
+    exam_score: Optional[float] = None
+    study_time_minutes: int
 
 
 class AnalyticsResponse(BaseModel):
@@ -19,13 +37,9 @@ class AnalyticsResponse(BaseModel):
     overall_average: float
     learning_streak: int
     total_study_time_minutes: int
-
-
-class PerformanceTrend(BaseModel):
-    date: str
-    quiz_score: Optional[float] = None
-    exam_score: Optional[float] = None
-    study_time_minutes: int
+    accuracy_trends: list[PerformanceTrend] = []
+    improvement_rate: float = 0.0
+    topic_mastery: list[SubjectMastery] = []
 
 
 class DashboardResponse(BaseModel):
@@ -36,4 +50,3 @@ class DashboardResponse(BaseModel):
     recent_activity: list[dict]
     progress_overview: list[SubjectStat]
     subject_stats: list[SubjectStat]
-

@@ -104,8 +104,7 @@ def get_me(current_user: User = Depends(get_current_user)):
 
 @router.get("/google/login")
 def google_login():
-    service = AuthService(get_db)
-    auth_url = service.get_google_auth_url()
+    auth_url = AuthService.get_google_auth_url()
     return {"auth_url": auth_url}
 
 
@@ -120,6 +119,7 @@ def google_callback(code: str, error: str = None, db: Session = Depends(get_db))
             "token": result["access_token"],
             "refresh_token": result["refresh_token"],
         })
-        return RedirectResponse(url=f"{settings.CORS_ORIGINS[0]}/auth/callback?{params}")
+        frontend_url = settings.APP_URL or "http://localhost:3000"
+        return RedirectResponse(url=f"{frontend_url}/auth/callback?{params}")
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

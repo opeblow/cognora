@@ -16,6 +16,7 @@ class Subject(Base):
     color = Column(String(7), nullable=True)
     order_index = Column(Integer, nullable=True)
 
+    chapters = relationship("Chapter", back_populates="subject", cascade="all, delete-orphan")
     lessons = relationship("Lesson", back_populates="subject", cascade="all, delete-orphan")
     quizzes = relationship("Quiz", back_populates="subject", cascade="all, delete-orphan")
     exams = relationship("Exam", back_populates="subject", cascade="all, delete-orphan")

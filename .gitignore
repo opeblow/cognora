@@ -11,3 +11,8 @@ build/
 .pytest_cache/
 *.db
 *.sqlite3
+*.log
+.DS_Store
+backend/uploads/
+backend/uvicorn_err.txt
+backend/uvicorn_out.txt

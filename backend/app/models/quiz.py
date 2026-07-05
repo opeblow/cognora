@@ -9,7 +9,7 @@ class Quiz(Base):
     __tablename__ = "quizzes"
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    subject_id = Column(String, ForeignKey("subjects.id", ondelete="CASCADE"), nullable=False)
+    subject_id = Column(String, ForeignKey("subjects.id", ondelete="CASCADE"), nullable=False, index=True)
     title = Column(String(255), nullable=False)
     description = Column(Text, nullable=True)
     difficulty = Column(String(50), nullable=True)
@@ -36,7 +36,6 @@ class Question(Base):
 
     quiz = relationship("Quiz", back_populates="questions")
     quiz_answers = relationship("QuizAnswer", back_populates="question", cascade="all, delete-orphan")
-    exam_answers = relationship("ExamAnswer", back_populates="question", cascade="all, delete-orphan")
 
 
 class QuizAttempt(Base):
@@ -44,7 +43,7 @@ class QuizAttempt(Base):
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     quiz_id = Column(String, ForeignKey("quizzes.id", ondelete="CASCADE"), nullable=False)
-    user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     score = Column(String(50), nullable=True)
     total = Column(String(50), nullable=True)
     percentage = Column(String(50), nullable=True)
@@ -62,12 +61,14 @@ class QuizAnswer(Base):
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     attempt_id = Column(String, ForeignKey("quiz_attempts.id", ondelete="CASCADE"), nullable=False)
-    question_id = Column(String, ForeignKey("questions.id", ondelete="CASCADE"), nullable=False)
+    question_id = Column(String, ForeignKey("questions.id", ondelete="CASCADE"), nullable=True)
+    pool_question_id = Column(String, ForeignKey("question_pool.id", ondelete="CASCADE"), nullable=True)
     selected_answer = Column(String(50), nullable=False)
     is_correct = Column(Boolean, default=False)
 
     attempt = relationship("QuizAttempt", back_populates="answers")
     question = relationship("Question", back_populates="quiz_answers")
+    pool_question = relationship("QuestionPool", backref="quiz_answers")
 
 
 

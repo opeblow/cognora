@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useRouter, useParams } from "next/navigation"
 import { useQuery } from "@tanstack/react-query"
 import { useAuthStore } from "@/store/auth"
@@ -24,10 +24,10 @@ export default function QuizDetailPage() {
 
   const [currentQuestion, setCurrentQuestion] = useState(0)
   const [answers, setAnswers] = useState<Record<string, string>>({})
-  const [timeLeft, setTimeLeft] = useState<number | null>(null)
-  const [startTime] = useState(Date.now())
+  const [startTime] = useState(() => Date.now())
   const [result, setResult] = useState<SubmitQuizResponse | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const [elapsed, setElapsed] = useState(0)
 
   useEffect(() => {
     if (!isAuthenticated) router.push("/login")
@@ -39,30 +39,14 @@ export default function QuizDetailPage() {
     enabled: isAuthenticated,
   })
 
-  useEffect(() => {
-    if (quiz?.time_limit_minutes) {
-      setTimeLeft(parseInt(quiz.time_limit_minutes) * 60)
-    }
-  }, [quiz])
-
-  useEffect(() => {
-    if (timeLeft === null || timeLeft <= 0 || result) return
-    const timer = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev === null || prev <= 1) {
-          clearInterval(timer)
-          handleSubmit()
-          return 0
-        }
-        return prev - 1
-      })
-    }, 1000)
-    return () => clearInterval(timer)
-  }, [timeLeft, result])
+  const timeLimit = quiz?.time_limit_minutes ? parseInt(quiz.time_limit_minutes) * 60 : null
+  const timeLeft = timeLimit !== null ? Math.max(0, timeLimit - elapsed) : null
 
   const handleAnswer = (questionId: string, answer: string) => {
     setAnswers((prev) => ({ ...prev, [questionId]: answer }))
   }
+
+  const handleSubmitRef = useRef<(() => Promise<void>) | null>(null)
 
   const handleSubmit = async () => {
     if (submitting) return
@@ -83,6 +67,25 @@ export default function QuizDetailPage() {
       setSubmitting(false)
     }
   }
+
+  useEffect(() => { handleSubmitRef.current = handleSubmit })
+
+  useEffect(() => {
+    if (timeLimit === null || result) return
+
+    const timer = setInterval(() => {
+      setElapsed((prev) => {
+        const next = prev + 1
+        if (next >= timeLimit) {
+          clearInterval(timer)
+          handleSubmitRef.current?.()
+        }
+        return next
+      })
+    }, 1000)
+
+    return () => clearInterval(timer)
+  }, [timeLimit, result])
 
   if (!isAuthenticated) return null
   if (isLoading) {

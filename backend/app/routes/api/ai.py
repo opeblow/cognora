@@ -6,6 +6,9 @@ from app.schemas.ai import TutorRequest, TutorResponse, GenerateQuizRequest, Gen
 from app.services.ai_service import AIService
 from app.services.credit_service import CreditService
 from app.models.user import User
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/ai", tags=["AI Tutor"])
 
@@ -23,8 +26,11 @@ def tutor_chat(
         raise HTTPException(status_code=402, detail=str(e))
 
     ai_service = AIService()
-    result = ai_service.tutor_chat(request.message, request.subject, request.context)
-    return TutorResponse(**result)
+    try:
+        result = ai_service.tutor_chat(request.message, request.subject, request.context)
+        return TutorResponse(**result)
+    except ValueError as e:
+        raise HTTPException(status_code=502, detail=str(e))
 
 
 @router.post("/generate-quiz", response_model=dict)
@@ -40,5 +46,8 @@ def generate_quiz(
         raise HTTPException(status_code=402, detail=str(e))
 
     ai_service = AIService()
-    result = ai_service.generate_quiz(request.subject, request.topic, request.difficulty, request.num_questions)
-    return result
+    try:
+        result = ai_service.generate_quiz(request.subject, request.topic, request.difficulty, request.num_questions)
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=502, detail=str(e))

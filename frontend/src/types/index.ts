@@ -85,9 +85,9 @@ export interface Exam {
   description: string | null
   exam_type: string
   year: string | null
-  time_limit_minutes: string | null
-  total_questions: string | null
-  pass_percentage: string | null
+  time_limit_minutes: number | null
+  total_questions: number | null
+  pass_percentage: number | null
   subject?: Subject
 }
 
@@ -189,7 +189,9 @@ export interface Topic {
   id: string
   title: string
   content: string | null
+  content_type?: string
   order_index: number | null
+  lesson_title?: string | null
 }
 
 export interface LessonDetail extends Lesson {
@@ -197,7 +199,81 @@ export interface LessonDetail extends Lesson {
   topics: Topic[]
 }
 
+export interface TopicDetail {
+  id: string
+  title: string
+  content: string | null
+  has_expanded: boolean
+  lesson: {
+    id: string
+    title: string
+    slug: string
+  }
+  subject: {
+    id: string
+    name: string
+    slug: string
+    color: string | null
+  }
+  all_topics: Topic[]
+}
+
+export interface ExpandResponse {
+  content: string
+  expanded: boolean
+  subject?: string
+  topic?: string
+}
+
 export interface TutorMessage {
   role: "user" | "assistant"
   content: string
+}
+
+// ===== Textbook Section Types (Lazy Loading) =====
+
+export interface SectionPlan {
+  index: number
+  title: string
+  focus: string
+}
+
+export interface TextbookPlanResponse {
+  topic_id: string
+  topic_title: string
+  subject_name: string
+  total_sections: number
+  sections: SectionPlan[]
+}
+
+export interface SectionContent {
+  index: number
+  title: string
+  content: string
+  has_content: boolean
+}
+
+export interface TextbookStatusResponse {
+  topic_id: string
+  total_sections: number
+  generated_sections: number[]
+  sections: SectionContent[]
+}
+
+export interface GenerateSectionResponse {
+  section_index: number
+  total_sections: number
+  content: string
+  section_title: string
+  has_more: boolean
+}
+
+export interface LiveQuestion {
+  id: string
+  text: string
+  options: string[]
+  correct_answer: string
+  explanation: string
+  difficulty: string
+  cognitive_level: string
 }

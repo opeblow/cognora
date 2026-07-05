@@ -1,5 +1,5 @@
 import { api } from "./api"
-import type { Exam, StartExamResponse, SubmitQuizResponse, ExamResult } from "@/types"
+import type { Exam, StartExamResponse, SubmitQuizResponse, ExamResult, LiveQuestion } from "@/types"
 
 export const examService = {
   getAll: (subjectId?: string, examType?: string, page = 1, pageSize = 20) => {
@@ -16,4 +16,10 @@ export const examService = {
     api.post<SubmitQuizResponse>(`/exams/results/${resultId}/submit`, data),
 
   getMyResults: () => api.get<{ results: ExamResult[]; total: number }>("/exams/results/mine"),
+
+  // Real-time question generation via Brace API
+  generateLiveQuestions: (examId: string, numQuestions = 5) =>
+    api.post<{ questions: LiveQuestion[]; generated: number }>(
+      `/exams/${examId}/generate-questions?num_questions=${numQuestions}`
+    ),
 }

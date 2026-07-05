@@ -10,7 +10,10 @@ class ExamRepository(BaseRepository[Exam]):
         super().__init__(Exam, db)
 
     def get_with_questions(self, id) -> Optional[Exam]:
-        query = select(self.model).where(self.model.id == id).options(joinedload(self.model.questions))
+        query = select(self.model).where(self.model.id == id).options(
+            joinedload(self.model.questions),
+            joinedload(self.model.subject),
+        )
         return self.db.execute(query).unique().scalar_one_or_none()
 
     def get_by_subject(self, subject_id: str) -> list[Exam]:

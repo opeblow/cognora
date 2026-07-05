@@ -8,7 +8,6 @@ import { Sidebar } from "@/components/layout/sidebar"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
 import { Send, Brain, User, Sparkles, Loader2 } from "lucide-react"
 import { toast } from "sonner"
 import type { TutorMessage } from "@/types"
@@ -19,7 +18,7 @@ export default function AITutorPage() {
   const [messages, setMessages] = useState<TutorMessage[]>([
     {
       role: "assistant",
-      content: "Hi! I'm your Cognora AI tutor. I can help you with any subject for WAEC, NECO, GCE, JAMB, and Post-UTME. What would you like to learn today?",
+      content: "Hi! I'm your Cognora AI tutor. I can help you with any subject for WAEC, NECO, GCE, JAMB, and Post-UTME preparations. What would you like to learn today?",
     },
   ])
   const [input, setInput] = useState("")

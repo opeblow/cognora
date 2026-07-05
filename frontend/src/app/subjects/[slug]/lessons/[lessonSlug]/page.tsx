@@ -86,9 +86,9 @@ export default function LessonDetailPage() {
           {topics.length > 0 && (
             <div className="mb-6 flex flex-wrap gap-2">
               {topics.map((topic, i) => (
-                <button
+                <Link
                   key={topic.id}
-                  onClick={() => setActiveTopic(i)}
+                  href={`/subjects/${slug}/topics/${topic.id}`}
                   className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
                     activeTopic === i
                       ? "bg-[#2563EB] text-white"
@@ -96,7 +96,7 @@ export default function LessonDetailPage() {
                   }`}
                 >
                   {topic.title}
-                </button>
+                </Link>
               ))}
             </div>
           )}
@@ -117,6 +117,21 @@ export default function LessonDetailPage() {
                 </div>
               )}
             </CardContent>
+            {currentTopic && (
+              <div className="border-t border-gray-100 px-8 py-3">
+                <Link href={`/subjects/${slug}/topics/${currentTopic.id}`}>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-2 text-xs"
+                  >
+                    <BookOpen className="h-3 w-3" />
+                    Open topic page
+                  </Button>
+                </Link>
+                <span className="ml-2 text-xs text-gray-400">(textbook + quiz)</span>
+              </div>
+            )}
           </Card>
 
           <div className="flex items-center justify-between gap-4">

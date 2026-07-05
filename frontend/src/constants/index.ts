@@ -31,6 +31,7 @@ export const ROUTES = {
   SUBJECTS: "/subjects",
   SUBJECT: (slug: string) => `/subjects/${slug}`,
   LESSON: (slug: string, lessonSlug: string) => `/subjects/${slug}/lessons/${lessonSlug}`,
+  TOPIC: (slug: string, topicId: string) => `/subjects/${slug}/topics/${topicId}`,
   QUIZZES: "/quizzes",
   QUIZ: (id: string) => `/quizzes/${id}`,
   EXAMS: "/exams",

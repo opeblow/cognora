@@ -9,6 +9,7 @@ class EmailService:
     def __init__(self):
         self.api_key = settings.RESEND_API_KEY
         self.from_address = settings.FROM_EMAIL or "Cognora <noreply@cognora.app>"
+        self.base_url = (settings.APP_URL or "http://localhost:3000").rstrip("/")
         if self.api_key:
             resend.api_key = self.api_key
 
@@ -31,9 +32,7 @@ class EmailService:
             return False
 
     def send_verification_email(self, to: str, token: str) -> bool:
-        verification_url = f"http://localhost:3000/verify-email?token={token}"
-
-        logger.info(f"=== VERIFICATION LINK for {to}: {verification_url} ===")
+        verification_url = f"{self.base_url}/verify-email?token={token}"
 
         html = f"""
         <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 480px; margin: 0 auto; padding: 32px 24px;">
@@ -55,9 +54,7 @@ class EmailService:
         return self.send_email(to, "Verify your email", html)
 
     def send_password_reset_email(self, to: str, token: str) -> bool:
-        reset_url = f"http://localhost:3000/reset-password?token={token}"
-
-        logger.info(f"=== PASSWORD RESET LINK for {to}: {reset_url} ===")
+        reset_url = f"{self.base_url}/reset-password?token={token}"
 
         html = f"""
         <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 480px; margin: 0 auto; padding: 32px 24px;">

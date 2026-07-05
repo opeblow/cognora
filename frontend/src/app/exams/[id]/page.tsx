@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useRouter, useParams } from "next/navigation"
 import { useAuthStore } from "@/store/auth"
 import { examService } from "@/services/exams"
@@ -11,9 +11,9 @@ import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Label } from "@/components/ui/label"
-import { CheckCircle2, XCircle, Clock, ArrowLeft, ArrowRight } from "lucide-react"
+import { CheckCircle2, XCircle, Clock, ArrowLeft, ArrowRight, RefreshCw, Sparkles } from "lucide-react"
 import { toast } from "sonner"
-import type { SubmitQuizResponse } from "@/types"
+import type { SubmitQuizResponse, LiveQuestion } from "@/types"
 
 export default function ExamDetailPage() {
   const router = useRouter()
@@ -24,14 +24,16 @@ export default function ExamDetailPage() {
   const [currentQuestion, setCurrentQuestion] = useState(0)
   const [answers, setAnswers] = useState<Record<string, string>>({})
   const [timeLeft, setTimeLeft] = useState<number | null>(null)
-  const [startTime] = useState(Date.now())
+  const [startTime] = useState(() => Date.now())
   const [result, setResult] = useState<SubmitQuizResponse | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const [fetchingLive, setFetchingLive] = useState(false)
   const [examData, setExamData] = useState<{
     result_id: string
     exam: { id: string; title: string; description: string | null; exam_type: string; time_limit_minutes: string | null; pass_percentage: string | null; questions: { id: string; text: string; options: string[] }[] }
     time_limit_minutes: number
   } | null>(null)
+  const [liveQuestions, setLiveQuestions] = useState<LiveQuestion[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -58,24 +60,26 @@ export default function ExamDetailPage() {
     startExam()
   }, [isAuthenticated, examId, router])
 
-  useEffect(() => {
-    if (timeLeft === null || timeLeft <= 0 || result) return
-    const timer = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev === null || prev <= 1) {
-          clearInterval(timer)
-          handleSubmit()
-          return 0
-        }
-        return prev - 1
-      })
-    }, 1000)
-    return () => clearInterval(timer)
-  }, [timeLeft, result])
+  const handleFetchLiveQuestions = async () => {
+    if (fetchingLive) return
+    setFetchingLive(true)
+    try {
+      const data = await examService.generateLiveQuestions(examId, 5)
+      setLiveQuestions((prev) => [...prev, ...data.questions])
+      toast.success(`${data.generated} new questions generated from real exam sources`)
+    } catch (err: unknown) {
+      const e = err as { message?: string }
+      toast.error(e.message || "Failed to fetch live questions")
+    } finally {
+      setFetchingLive(false)
+    }
+  }
 
   const handleAnswer = (questionId: string, answer: string) => {
     setAnswers((prev) => ({ ...prev, [questionId]: answer }))
   }
+
+  const handleSubmitRef = useRef<(() => Promise<void>) | null>(null)
 
   const handleSubmit = async () => {
     if (submitting || !examData) return
@@ -93,6 +97,23 @@ export default function ExamDetailPage() {
       setSubmitting(false)
     }
   }
+
+  useEffect(() => { handleSubmitRef.current = handleSubmit })
+
+  useEffect(() => {
+    if (timeLeft === null || timeLeft <= 0 || result) return
+    const timer = setInterval(() => {
+      setTimeLeft((prev) => {
+        if (prev === null || prev <= 1) {
+          clearInterval(timer)
+          handleSubmitRef.current?.()
+          return 0
+        }
+        return prev - 1
+      })
+    }, 1000)
+    return () => clearInterval(timer)
+  }, [timeLeft, result])
 
   if (!isAuthenticated) return null
   if (loading) {
@@ -185,8 +206,12 @@ export default function ExamDetailPage() {
     )
   }
 
-  const questions = examData?.exam?.questions || []
-  const question = questions[currentQuestion]
+  const staticQuestions = examData?.exam?.questions || []
+  const allQuestions = [
+    ...staticQuestions.map((q) => ({ ...q, id: q.id, source: "static" as const })),
+    ...liveQuestions.map((q) => ({ ...q, id: q.id, source: "live" as const, text: q.text, options: q.options })),
+  ]
+  const question = allQuestions[currentQuestion]
 
   return (
     <div className="flex min-h-screen bg-[#F8FAFC]">
@@ -197,21 +222,43 @@ export default function ExamDetailPage() {
             <div>
               <h1 className="text-xl font-bold text-[#0F172A]">{examData?.exam?.title}</h1>
               <p className="text-sm text-gray-500">
-                Question {currentQuestion + 1} of {questions.length}
+                Question {currentQuestion + 1} of {allQuestions.length}
               </p>
+              {question?.source === "live" && (
+                <Badge variant="accent" className="mt-1 text-xs">
+                  <Sparkles className="mr-1 h-3 w-3" />
+                  Live (Brace API)
+                </Badge>
+              )}
             </div>
-            {timeLeft !== null && (
-              <div className="flex items-center gap-2 text-sm font-medium text-gray-600">
-                <Clock className="h-4 w-4" />
-                <span className={timeLeft < 300 ? "text-red-600" : ""}>
-                  {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, "0")}
-                </span>
-              </div>
-            )}
+            <div className="flex items-center gap-3">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleFetchLiveQuestions}
+                disabled={fetchingLive}
+                className="gap-1 text-xs"
+              >
+                {fetchingLive ? (
+                  <RefreshCw className="h-3 w-3 animate-spin" />
+                ) : (
+                  <Sparkles className="h-3 w-3" />
+                )}
+                Fetch more questions
+              </Button>
+              {timeLeft !== null && (
+                <div className="flex items-center gap-2 text-sm font-medium text-gray-600">
+                  <Clock className="h-4 w-4" />
+                  <span className={timeLeft < 300 ? "text-red-600" : ""}>
+                    {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, "0")}
+                  </span>
+                </div>
+              )}
+            </div>
           </div>
 
           <Progress
-            value={((currentQuestion + 1) / questions.length) * 100}
+            value={((currentQuestion + 1) / allQuestions.length) * 100}
             className="mb-6"
           />
 
@@ -250,7 +297,7 @@ export default function ExamDetailPage() {
             >
               <ArrowLeft className="mr-2 h-4 w-4" /> Previous
             </Button>
-            {currentQuestion < questions.length - 1 ? (
+            {currentQuestion < allQuestions.length - 1 ? (
               <Button onClick={() => setCurrentQuestion((p) => p + 1)}>
                 Next <ArrowRight className="ml-2 h-4 w-4" />
               </Button>

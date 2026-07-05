@@ -1,0 +1,124 @@
+{
+  "exam_board": "WAEC",
+  "subject": "Mathematics",
+  "year": "2026",
+  "syllabus_url": "https://waeconline.org.ng/e-learning/Mathematics/mathmain.html",
+  "modules": [
+    {
+      "id": "numeration",
+      "title": "Number and Numeration",
+      "weight_in_exam": 25,
+      "topics": [
+        {
+          "id": "indices",
+          "title": "Indices and Standard Form",
+          "examination_focus": ["Simplifying indices", "Negative indices", "Fractional indices", "Standard form", "Laws of indices"],
+          "past_question_years": ["2024", "2025"],
+          "typical_question_style": "simplify expression with indices",
+          "difficulty_rating": "easy"
+        },
+        {
+          "id": "logarithms",
+          "title": "Logarithms",
+          "examination_focus": ["Logarithm rules", "Change of base", "Solving logarithmic equations", "Application of logarithms"],
+          "past_question_years": ["2023", "2024", "2025"],
+          "typical_question_style": "evaluate logarithmic expression",
+          "difficulty_rating": "medium"
+        },
+        {
+          "id": "sequences",
+          "title": "Sequences and Series",
+          "examination_focus": ["Arithmetic progression", "Geometric progression", "Sum of terms", "Application problems"],
+          "past_question_years": ["2023", "2025"],
+          "typical_question_style": "find nth term of AP/GP",
+          "difficulty_rating": "medium"
+        }
+      ]
+    },
+    {
+      "id": "algebra",
+      "title": "Algebra",
+      "weight_in_exam": 30,
+      "topics": [
+        {
+          "id": "quadratics",
+          "title": "Quadratic Equations",
+          "examination_focus": ["Solving by factorization", "Completing the square", "Quadratic formula", "Nature of roots", "Sum and product of roots"],
+          "past_question_years": ["2024", "2025"],
+          "typical_question_style": "solve quadratic equation and find nature of roots",
+          "difficulty_rating": "medium"
+        },
+        {
+          "id": "simultaneous",
+          "title": "Simultaneous Equations",
+          "examination_focus": ["Elimination method", "Substitution method", "Word problems", "One linear one quadratic"],
+          "past_question_years": ["2023", "2024", "2025"],
+          "typical_question_style": "solve pair of simultaneous equations",
+          "difficulty_rating": "easy"
+        },
+        {
+          "id": "inequalities",
+          "title": "Inequalities",
+          "examination_focus": ["Linear inequalities", "Quadratic inequalities", "Number line representation", "Word problems"],
+          "past_question_years": ["2024"],
+          "typical_question_style": "solve and graph inequality",
+          "difficulty_rating": "medium"
+        }
+      ]
+    },
+    {
+      "id": "geometry",
+      "title": "Geometry and Trigonometry",
+      "weight_in_exam": 30,
+      "topics": [
+        {
+          "id": "trig_ratios",
+          "title": "Trigonometric Ratios",
+          "examination_focus": ["Sine, cosine, tangent", "Special angles", "Identifying sides", "Applications to right triangles"],
+          "past_question_years": ["2023", "2024", "2025"],
+          "typical_question_style": "find trigonometric ratio from triangle",
+          "difficulty_rating": "easy"
+        },
+        {
+          "id": "trig_identities",
+          "title": "Trigonometric Identities and Equations",
+          "examination_focus": ["Basic identities", "Solving trig equations", "Sine and cosine rules", "Bearings and elevations"],
+          "past_question_years": ["2024", "2025"],
+          "typical_question_style": "solve trigonometric equation for given range",
+          "difficulty_rating": "hard"
+        },
+        {
+          "id": "circles",
+          "title": "Circle Geometry",
+          "examination_focus": ["Circle theorems", "Angles in circles", "Tangents", "Cyclic quadrilaterals"],
+          "past_question_years": ["2023", "2025"],
+          "typical_question_style": "find angle using circle theorem",
+          "difficulty_rating": "medium"
+        }
+      ]
+    },
+    {
+      "id": "statistics",
+      "title": "Statistics and Probability",
+      "weight_in_exam": 15,
+      "topics": [
+        {
+          "id": "measures",
+          "title": "Measures of Central Tendency",
+          "examination_focus": ["Mean, median, mode", "Grouped data", "Cumulative frequency", "Ogive"],
+          "past_question_years": ["2024", "2025"],
+          "typical_question_style": "calculate mean from frequency table",
+          "difficulty_rating": "easy"
+        },
+        {
+          "id": "probability",
+          "title": "Probability",
+          "examination_focus": ["Simple probability", "Mutually exclusive events", "Independent events", "Tree diagrams"],
+          "past_question_years": ["2023", "2024", "2025"],
+          "typical_question_style": "find probability of combined events",
+          "difficulty_rating": "medium"
+        }
+      ]
+    }
+  ]
+}

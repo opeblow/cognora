@@ -17,4 +17,21 @@ celery_app.conf.update(
     task_track_started=True,
     task_time_limit=30 * 60,
     task_soft_time_limit=25 * 60,
+    beat_schedule={
+        "reset-weekly-credits": {
+            "task": "app.workers.tasks.reset_weekly_credits",
+            "schedule": 604800,  # 7 days
+            "args": (),
+        },
+        "cleanup-expired-tokens": {
+            "task": "app.workers.tasks.cleanup_expired_tokens",
+            "schedule": 86400,  # 24 hours
+            "args": (),
+        },
+        "pre-generate-textbook-sections": {
+            "task": "app.workers.tasks.pre_generate_textbook_sections",
+            "schedule": 43200,  # 12 hours
+            "args": (),
+        },
+    },
 )

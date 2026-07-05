@@ -47,11 +47,14 @@ export default function ExamsPage() {
                       <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-[#F59E0B]/10">
                         <GraduationCap className="h-6 w-6 text-[#F59E0B]" />
                       </div>
-                      <div>
+                        <div>
                         <h3 className="font-semibold text-[#0F172A]">{exam.title}</h3>
                         <div className="mt-1 flex items-center gap-3 text-xs text-gray-500">
                           <Badge variant="accent">{exam.exam_type}</Badge>
                           {exam.year && <span>{exam.year}</span>}
+                          {exam.total_questions && (
+                            <span>{exam.total_questions} questions</span>
+                          )}
                           {exam.time_limit_minutes && (
                             <span className="flex items-center gap-1">
                               <Clock className="h-3 w-3" />

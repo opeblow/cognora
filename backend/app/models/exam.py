@@ -9,7 +9,7 @@ class Exam(Base):
     __tablename__ = "exams"
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    subject_id = Column(String, ForeignKey("subjects.id", ondelete="CASCADE"), nullable=False)
+    subject_id = Column(String, ForeignKey("subjects.id", ondelete="CASCADE"), nullable=False, index=True)
     title = Column(String(255), nullable=False)
     description = Column(Text, nullable=True)
     exam_type = Column(String(50), nullable=False)
@@ -29,7 +29,7 @@ class ExamQuestion(Base):
     __tablename__ = "exam_questions"
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    exam_id = Column(String, ForeignKey("exams.id", ondelete="CASCADE"), nullable=False)
+    exam_id = Column(String, ForeignKey("exams.id", ondelete="CASCADE"), nullable=False, index=True)
     text = Column(Text, nullable=False)
     options = Column(JSON, nullable=False)
     correct_answer = Column(String(50), nullable=False)
@@ -37,6 +37,7 @@ class ExamQuestion(Base):
     order_index = Column(Integer, nullable=True)
 
     exam = relationship("Exam", back_populates="questions")
+    exam_answers = relationship("ExamAnswer", back_populates="question", cascade="all, delete-orphan")
 
 
 class ExamResult(Base):
@@ -44,7 +45,7 @@ class ExamResult(Base):
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     exam_id = Column(String, ForeignKey("exams.id", ondelete="CASCADE"), nullable=False)
-    user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     score = Column(String(50), nullable=True)
     total = Column(String(50), nullable=True)
     percentage = Column(String(50), nullable=True)
@@ -63,12 +64,12 @@ class ExamAnswer(Base):
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     result_id = Column(String, ForeignKey("exam_results.id", ondelete="CASCADE"), nullable=False)
-    question_id = Column(String, ForeignKey("questions.id", ondelete="CASCADE"), nullable=False)
+    question_id = Column(String, ForeignKey("exam_questions.id", ondelete="CASCADE"), nullable=False)
     selected_answer = Column(String(50), nullable=True)
     is_correct = Column(Boolean, default=False)
 
     result = relationship("ExamResult", back_populates="answers")
-    question = relationship("Question", back_populates="exam_answers")
+    question = relationship("ExamQuestion", back_populates="exam_answers")
 
 
 

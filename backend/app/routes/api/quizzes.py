@@ -30,7 +30,7 @@ def get_quiz(
 ):
     service = QuizService(db)
     try:
-        return service.get_quiz_detail(quiz_id)
+        return service.get_quiz_detail(quiz_id, str(current_user.id))
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 

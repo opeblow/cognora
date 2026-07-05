@@ -12,38 +12,52 @@ function CallbackContent() {
   const { setAuth } = useAuthStore()
   const [error, setError] = useState<string | null>(null)
 
+  const token = searchParams.get("token")
+  const refreshToken = searchParams.get("refresh_token")
+
   useEffect(() => {
-    const token = searchParams.get("token")
-    const refreshToken = searchParams.get("refresh_token")
+    if (!token || !refreshToken) return
 
-    if (token && refreshToken) {
-      localStorage.setItem("token", token)
-      localStorage.setItem("refreshToken", refreshToken)
+    localStorage.setItem("token", token)
+    localStorage.setItem("refreshToken", refreshToken)
 
-      authService.getMe()
-        .then((user) => {
-          setAuth(
-            {
-              id: user.id,
-              email: user.email,
-              full_name: user.full_name,
-              avatar_url: user.avatar_url,
-              is_verified: user.is_verified,
-              credits: user.credits,
-              learning_streak: user.learning_streak,
-            },
-            token,
-            refreshToken
-          )
-          router.push("/dashboard")
-        })
-        .catch(() => {
-          setError("Failed to complete authentication")
-        })
-    } else {
-      setError("Invalid authentication response")
-    }
-  }, [searchParams, router, setAuth])
+    authService.getMe()
+      .then((user) => {
+        setAuth(
+          {
+            id: user.id,
+            email: user.email,
+            full_name: user.full_name,
+            avatar_url: user.avatar_url,
+            is_verified: user.is_verified,
+            credits: user.credits,
+            learning_streak: user.learning_streak,
+          },
+          token,
+          refreshToken
+        )
+        router.push("/dashboard")
+      })
+      .catch(() => {
+        setError("Failed to complete authentication")
+      })
+  }, [token, refreshToken, router, setAuth])
+
+  if (!token || !refreshToken) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="text-center">
+          <p className="text-red-600">Invalid authentication response</p>
+          <button
+            onClick={() => router.push("/login")}
+            className="mt-4 text-sm font-medium text-[#2563EB] hover:text-[#1d4ed8]"
+          >
+            Back to login
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="flex min-h-screen items-center justify-center">

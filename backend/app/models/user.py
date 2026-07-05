@@ -20,6 +20,10 @@ class User(Base):
     weekly_credits_used = Column(Integer, default=0)
     weekly_credits_reset_at = Column(DateTime(timezone=True), nullable=True)
     learning_streak = Column(Integer, default=0)
+    longest_streak = Column(Integer, default=0)
+    streak_freezes = Column(Integer, default=0)
+    total_xp = Column(Integer, default=0)
+    level = Column(Integer, default=1)
     last_active_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
@@ -32,6 +36,14 @@ class User(Base):
     quiz_attempts = relationship("QuizAttempt", back_populates="user", cascade="all, delete-orphan")
     exam_results = relationship("ExamResult", back_populates="user", cascade="all, delete-orphan")
     study_plans = relationship("StudyPlan", back_populates="user", cascade="all, delete-orphan")
+    settings = relationship("UserSettings", back_populates="user", uselist=False, cascade="all, delete-orphan")
+    uploaded_files = relationship("UploadedFile", back_populates="user", cascade="all, delete-orphan")
+    audio_recordings = relationship("AudioRecording", back_populates="user", cascade="all, delete-orphan")
+    tutoring_sessions = relationship("LiveSession", foreign_keys="LiveSession.tutor_id", back_populates="tutor", cascade="all, delete-orphan")
+    learning_sessions = relationship("LiveSession", foreign_keys="LiveSession.student_id", back_populates="student", cascade="all, delete-orphan")
+    badges = relationship("UserBadge", back_populates="user", cascade="all, delete-orphan")
+    created_lobbies = relationship("StudyLobby", back_populates="creator", cascade="all, delete-orphan")
+    flashcards = relationship("Flashcard", back_populates="user", cascade="all, delete-orphan")
 
 
 class EmailVerification(Base):
