@@ -8,10 +8,11 @@ import { lessonService } from "@/services/lessons"
 import { Sidebar } from "@/components/layout/sidebar"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { BookOpen, ChevronLeft, Loader2, Flag, BookText, ChevronRight, Zap, CheckCircle2, Sparkles } from "lucide-react"
+import { BookOpen, ChevronLeft, Loader2, Flag, BookText, ChevronRight, Zap, CheckCircle2, Sparkles, Brain } from "lucide-react"
 import Link from "next/link"
 import { toast } from "sonner"
 import { issuesService } from "@/services/issues"
+import { flashcardService } from "@/services/flashcards"
 import { sanitizeHtml } from "@/lib/sanitizeHtml"
 
 export default function TopicDetailPage() {
@@ -28,6 +29,7 @@ export default function TopicDetailPage() {
   const [activeSection, setActiveSection] = useState(0)
   const [sectionCache, setSectionCache] = useState<Record<number, string>>({})
   const [generatingSection, setGeneratingSection] = useState<number | null>(null)
+  const [generatingFlashcards, setGeneratingFlashcards] = useState(false)
 
   useEffect(() => {
     if (!isAuthenticated) router.push("/login")
@@ -92,6 +94,24 @@ export default function TopicDetailPage() {
   const handleGenerate = (sectionIndex: number) => {
     setGeneratingSection(sectionIndex)
     generateMutation.mutate(sectionIndex)
+  }
+
+  const flashcardMutation = useMutation({
+    mutationFn: () => flashcardService.generate(topicId, 10),
+    onSuccess: (data) => {
+      setGeneratingFlashcards(false)
+      toast.success(`Generated ${data.total || data.flashcards.length} flashcards!`)
+      queryClient.invalidateQueries({ queryKey: ["flashcards"] })
+    },
+    onError: () => {
+      setGeneratingFlashcards(false)
+      toast.error("Failed to generate flashcards. Not enough credits?")
+    },
+  })
+
+  const handleGenerateFlashcards = () => {
+    setGeneratingFlashcards(true)
+    flashcardMutation.mutate()
   }
 
   const handleReportIssue = async () => {
@@ -341,6 +361,41 @@ export default function TopicDetailPage() {
               </CardContent>
             </Card>
           )}
+
+          <Card className="mb-6 overflow-hidden border-0 shadow-lg">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-purple-50">
+                    <Brain className="h-5 w-5 text-purple-600" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-semibold text-[#0F172A]">Flashcards</h2>
+                    <p className="text-xs text-gray-400">AI-generated Q&amp;A cards with spaced repetition</p>
+                  </div>
+                </div>
+                <Button
+                  size="sm"
+                  onClick={handleGenerateFlashcards}
+                  disabled={generatingFlashcards}
+                  className="gap-1.5 bg-purple-600 hover:bg-purple-700"
+                >
+                  {generatingFlashcards ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Sparkles className="h-3.5 w-3.5" />
+                  )}
+                  {generatingFlashcards ? "Generating..." : "Generate 10 Cards (2 credits)"}
+                </Button>
+              </div>
+              <p className="mt-3 text-sm text-gray-500">
+                Flashcards help you memorize key concepts. Rate yourself after each review — the system schedules future reviews based on how well you know each card.
+              </p>
+              <Link href="/flashcards" className="mt-3 inline-flex items-center gap-1 text-sm text-purple-600 hover:underline">
+                Go to Flashcard Review →
+              </Link>
+            </CardContent>
+          </Card>
 
           <div className="flex justify-center">
             <Link href={`/subjects/${slug}`}>
