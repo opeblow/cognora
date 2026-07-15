@@ -1,8 +1,10 @@
+import asyncio
 import json
 import logging
 from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect, status
 from sqlalchemy.orm import Session
 from app.database.base import get_db, SessionLocal
+from app.database.redis import get_redis, NullRedis
 from app.dependencies.auth import get_current_user
 from app.models.user import User
 from app.services.lobby_service import StudyLobbyService
@@ -23,32 +25,76 @@ router = APIRouter(prefix="/lobbies", tags=["Study Lobbies"])
 class ConnectionManager:
     def __init__(self):
         self.active_connections: dict[str, list[WebSocket]] = {}
+        self._pubsub_task: asyncio.Task | None = None
+        self._started = False
 
-    async def connect(self, lobby_id: str, websocket: WebSocket):
-        await websocket.accept()
-        if lobby_id not in self.active_connections:
-            self.active_connections[lobby_id] = []
-        self.active_connections[lobby_id].append(websocket)
+    async def _ensure_pubsub(self):
+        if self._started:
+            return
+        self._started = True
+        redis = await get_redis()
+        if isinstance(redis, NullRedis):
+            logger.info("Redis unavailable — lobby broadcasts are single-server only")
+            return
+        self._pubsub_task = asyncio.create_task(self._listen_redis(redis))
 
-    def disconnect(self, lobby_id: str, websocket: WebSocket):
-        if lobby_id in self.active_connections:
-            self.active_connections[lobby_id].remove(websocket)
-            if not self.active_connections[lobby_id]:
-                del self.active_connections[lobby_id]
+    async def _listen_redis(self, redis):
+        pubsub = redis.pubsub()
+        await pubsub.psubscribe("lobby:*")
+        try:
+            while True:
+                msg = await pubsub.get_message(ignore_subscribe_messages=True, timeout=1.0)
+                if msg and msg["type"] == "pmessage":
+                    channel = msg["channel"]
+                    lobby_id = channel.split(":", 1)[1]
+                    data = json.loads(msg["data"])
+                    await self._deliver_local(lobby_id, data)
+                await asyncio.sleep(0.01)
+        except asyncio.CancelledError:
+            pass
+        except Exception as e:
+            logger.error(f"Redis pubsub listener error: {e}")
+        finally:
+            try:
+                await pubsub.close()
+            except Exception:
+                pass
 
-    async def broadcast(self, lobby_id: str, message: dict, exclude: WebSocket = None):
+    async def _deliver_local(self, lobby_id: str, message: dict):
         if lobby_id not in self.active_connections:
             return
         dead = []
         for ws in self.active_connections[lobby_id]:
-            if ws == exclude:
-                continue
             try:
                 await ws.send_json(message)
             except Exception:
                 dead.append(ws)
         for ws in dead:
             self.disconnect(lobby_id, ws)
+
+    async def connect(self, lobby_id: str, websocket: WebSocket):
+        if lobby_id not in self.active_connections:
+            self.active_connections[lobby_id] = []
+        self.active_connections[lobby_id].append(websocket)
+
+    def disconnect(self, lobby_id: str, websocket: WebSocket):
+        if lobby_id in self.active_connections:
+            try:
+                self.active_connections[lobby_id].remove(websocket)
+            except ValueError:
+                pass
+            if not self.active_connections[lobby_id]:
+                del self.active_connections[lobby_id]
+
+    async def broadcast(self, lobby_id: str, message: dict, exclude: WebSocket = None):
+        await self._ensure_pubsub()
+
+        redis = await get_redis()
+        if not isinstance(redis, NullRedis):
+            await redis.publish(f"lobby:{lobby_id}", json.dumps(message))
+            return
+
+        await self._deliver_local(lobby_id, message)
 
 
 manager = ConnectionManager()
@@ -84,6 +130,7 @@ def create_lobby(
 def list_lobbies(
     skip: int = 0,
     limit: int = 50,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     service = StudyLobbyService(db)
@@ -109,6 +156,7 @@ def list_lobbies(
 @router.get("/{lobby_id}", response_model=LobbyResponse)
 def get_lobby(
     lobby_id: str,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     service = StudyLobbyService(db)
@@ -131,6 +179,7 @@ def get_lobby(
 def get_lobby_history(
     lobby_id: str,
     limit: int = 100,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     service = StudyLobbyService(db)
@@ -177,16 +226,23 @@ async def lobby_websocket(websocket: WebSocket, lobby_id: str):
 
     token = metadata.get("token", "")
     payload = decode_token(token)
-    if not payload:
+    if not payload or payload.get("type") != "access":
         await websocket.send_json({"error": "Authentication required"})
         await websocket.close()
         return
 
     user_id = payload.get("sub")
-    username = metadata.get("username", "Anonymous")
-
     db = SessionLocal()
     try:
+        from app.models.user import User as UserModel
+        user = db.query(UserModel).filter(UserModel.id == user_id).first()
+        if not user or not user.is_active:
+            await websocket.send_json({"error": "User not found or inactive"})
+            await websocket.close()
+            return
+
+        username = user.full_name or user.email.split("@")[0]
+
         service = StudyLobbyService(db)
         lobby = service.get_lobby(lobby_id)
         if not lobby or not lobby.is_active:
@@ -233,7 +289,7 @@ async def lobby_websocket(websocket: WebSocket, lobby_id: str):
 
             if len(msg_buffer) >= 3:
                 try:
-                    ai_text = service.generate_ai_response(lobby, msg_buffer)
+                    ai_text = await asyncio.to_thread(service.generate_ai_response, lobby, msg_buffer)
                     if ai_text:
                         ai_msg = service.save_message(
                             lobby_id, None, "Cognora AI", ai_text, is_ai_response=True

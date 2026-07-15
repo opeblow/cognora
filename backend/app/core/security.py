@@ -24,11 +24,13 @@ def _make_jwt(data: dict, expires_delta: timedelta) -> str:
 
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
-    return _make_jwt(data, expires_delta or timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES))
+    payload = {**data, "type": "access"}
+    return _make_jwt(payload, expires_delta or timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES))
 
 
 def create_refresh_token(data: dict) -> str:
-    return _make_jwt(data, timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS))
+    payload = {**data, "type": "refresh"}
+    return _make_jwt(payload, timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS))
 
 
 def decode_token(token: str) -> Optional[dict]:

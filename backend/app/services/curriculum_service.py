@@ -122,12 +122,18 @@ Return valid JSON:
             max_tokens=4096,
         )
 
-        result = json.loads(response.choices[0].message.content)
+        raw = response.choices[0].message.content
+        if not raw:
+            raise ValueError("OpenAI returned empty content for stage3 topic generation")
+        result = json.loads(raw)
         await r.setex(cache_key, 86400, json.dumps(result))
         return result
 
-    async def generate_grounded_question(self, subject: str, topic_title: str, difficulty: str = "medium") -> dict:
+    async def generate_grounded_question(self, subject: str, topic_title: str, difficulty: str = "medium", _depth: int = 0) -> dict:
         from app.services.grounding_service import GroundingService
+
+        if _depth >= 3:
+            return {"questions": [], "note": "Failed to generate non-contradicted question after 3 attempts"}
 
         draft = self.ai_service.generate_quiz(subject, topic_title, difficulty, num_questions=1)
 
@@ -138,7 +144,7 @@ Return valid JSON:
 
             rejected = [v for v in verdicts if v["status"] == "contradicted"]
             if rejected:
-                return await self.generate_grounded_question(subject, topic_title, difficulty)
+                return await self.generate_grounded_question(subject, topic_title, difficulty, _depth + 1)
 
         return draft
 
@@ -174,4 +180,7 @@ Return JSON:
             max_tokens=3000,
         )
 
-        return json.loads(response.choices[0].message.content)
+        raw = response.choices[0].message.content
+        if not raw:
+            raise ValueError("OpenAI returned empty content for stage5 weave")
+        return json.loads(raw)

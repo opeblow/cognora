@@ -20,10 +20,11 @@ export default function QuizzesPage() {
     if (!isAuthenticated) router.push("/login")
   }, [isAuthenticated, router])
 
-  const { data } = useQuery({
+  const { data, isLoading, isFetching } = useQuery({
     queryKey: ["quizzes"],
     queryFn: () => quizService.getAll(),
     enabled: isAuthenticated,
+    staleTime: 60000,
   })
 
   if (!isAuthenticated) return null
@@ -39,7 +40,14 @@ export default function QuizzesPage() {
           </p>
 
           <div className="mt-6 space-y-3">
-            {data?.quizzes?.map((quiz) => (
+            {isLoading && (
+              <div className="animate-pulse space-y-3">
+                {[1, 2, 3, 4, 5].map((i) => (
+                  <div key={i} className="h-20 rounded-xl bg-gray-100" />
+                ))}
+              </div>
+            )}
+            {!isLoading && data?.quizzes?.map((quiz) => (
               <Link key={quiz.id} href={`/quizzes/${quiz.id}`}>
                 <Card className="cursor-pointer transition-shadow hover:shadow-md">
                   <CardContent className="flex items-center justify-between p-5">
@@ -71,12 +79,19 @@ export default function QuizzesPage() {
                 </Card>
               </Link>
             ))}
-            {(!data?.quizzes || data.quizzes.length === 0) && (
+            {!isLoading && !isFetching && (!data?.quizzes || data.quizzes.length === 0) && (
               <Card>
                 <CardContent className="p-8 text-center">
                   <p className="text-gray-500">No quizzes available yet.</p>
                 </CardContent>
               </Card>
+            )}
+            {isFetching && !isLoading && (
+              <div className="animate-pulse space-y-3">
+                {[1, 2, 3, 4, 5].map((i) => (
+                  <div key={i} className="h-20 rounded-xl bg-gray-100" />
+                ))}
+              </div>
             )}
           </div>
         </div>

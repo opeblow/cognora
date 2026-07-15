@@ -4,22 +4,10 @@ from typing import Optional, Any
 import redis.asyncio as aioredis
 from app.core.config import settings
 
-redis_client = None
+from app.database.redis import get_redis as _get_db_redis
 
-
-def get_redis():
-    global redis_client
-    if redis_client is None:
-        try:
-            redis_client = aioredis.from_url(
-                settings.REDIS_URL,
-                decode_responses=True,
-                socket_connect_timeout=2,
-                socket_timeout=2,
-            )
-        except Exception:
-            redis_client = None
-    return redis_client
+async def get_redis():
+    return await _get_db_redis()
 
 
 def make_cache_key(prefix: str, *args, **kwargs) -> str:
@@ -30,7 +18,7 @@ def make_cache_key(prefix: str, *args, **kwargs) -> str:
 
 
 async def get_cached(key: str) -> Optional[str]:
-    client = get_redis()
+    client = await get_redis()
     if not client:
         return None
     try:
@@ -40,7 +28,7 @@ async def get_cached(key: str) -> Optional[str]:
 
 
 async def set_cached(key: str, value: Any, ttl: int = 300):
-    client = get_redis()
+    client = await get_redis()
     if not client:
         return
     try:
@@ -52,7 +40,7 @@ async def set_cached(key: str, value: Any, ttl: int = 300):
 
 
 async def invalidate_cache(pattern: str):
-    client = get_redis()
+    client = await get_redis()
     if not client:
         return
     try:
@@ -64,9 +52,12 @@ async def invalidate_cache(pattern: str):
 
 
 def cached(ttl: int = 300):
+    import functools
     def decorator(func):
+        @functools.wraps(func)
         async def wrapper(*args, **kwargs):
-            cache_key = make_cache_key(func.__name__, *args, **kwargs)
+            key_args = args[1:] if args and hasattr(args[0], '__dict__') else args
+            cache_key = make_cache_key(func.__name__, *key_args, **kwargs)
             cached_value = await get_cached(cache_key)
             if cached_value is not None:
                 try:

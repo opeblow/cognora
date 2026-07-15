@@ -1,5 +1,6 @@
 from pathlib import Path
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import field_validator
 from typing import List
 
 
@@ -65,8 +66,24 @@ class Settings(BaseSettings):
     AGORA_APP_CERTIFICATE: str = ""
 
     SENTRY_DSN: str = ""
-    DB_POOL_SIZE: int = 20
-    DB_MAX_OVERFLOW: int = 40
+    DB_POOL_SIZE: int = 10
+    DB_MAX_OVERFLOW: int = 20
+
+    @field_validator("DEBUG", mode="before")
+    @classmethod
+    def parse_debug(cls, value):
+        if isinstance(value, str) and value.lower() in {"release", "production", "prod"}:
+            return False
+        return value
+
+    @field_validator("CORS_ORIGINS", mode="after")
+    @classmethod
+    def check_cors(cls, value, info):
+        debug = info.data.get("DEBUG", False)
+        if not debug and value == ["http://localhost:3000"]:
+            import warnings
+            warnings.warn("CORS_ORIGINS is set to localhost in production! This will block real requests.")
+        return value
 
     model_config = SettingsConfigDict(
         env_file=Path(__file__).parent.parent.parent.parent / ".env",

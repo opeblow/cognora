@@ -12,14 +12,28 @@ function CallbackContent() {
   const { setAuth } = useAuthStore()
   const [error, setError] = useState<string | null>(null)
 
-  const token = searchParams.get("token")
-  const refreshToken = searchParams.get("refresh_token")
-
   useEffect(() => {
-    if (!token || !refreshToken) return
+    const getCookie = (name: string) => {
+      const value = `; ${document.cookie}`;
+      const parts = value.split(`; ${name}=`);
+      if (parts.length === 2) return parts.pop()?.split(';').shift();
+    }
+    const token = searchParams.get("token") || getCookie("access_token");
+    const refreshToken = searchParams.get("refresh_token") || getCookie("refresh_token");
 
-    localStorage.setItem("token", token)
-    localStorage.setItem("refreshToken", refreshToken)
+    if (!token || !refreshToken) {
+      setError("Invalid authentication response")
+      return
+    }
+
+    try {
+      localStorage.setItem("token", token)
+      localStorage.setItem("refreshToken", refreshToken)
+      document.cookie = "access_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+      document.cookie = "refresh_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+    } catch {
+      // localStorage may be unavailable
+    }
 
     authService.getMe()
       .then((user) => {
@@ -41,9 +55,9 @@ function CallbackContent() {
       .catch(() => {
         setError("Failed to complete authentication")
       })
-  }, [token, refreshToken, router, setAuth])
+  }, [searchParams, router, setAuth])
 
-  if (!token || !refreshToken) {
+  if (error === "Invalid authentication response") {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <div className="text-center">

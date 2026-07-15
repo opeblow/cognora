@@ -41,8 +41,34 @@ class NullRedis:
     async def close(self):
         pass
 
+    async def publish(self, channel, message):
+        return 0
+
+    def pubsub(self):
+        return NullPubSub()
+
     def pipeline(self):
         return NullPipeline()
+
+
+class NullPubSub:
+    async def subscribe(self, *args, **kwargs):
+        pass
+
+    async def unsubscribe(self, *args, **kwargs):
+        pass
+
+    async def get_message(self, ignore_subscribe_messages=False, timeout=None):
+        return None
+
+    async def close(self):
+        pass
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *args):
+        pass
 
 
 class NullPipeline:

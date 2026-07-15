@@ -5,7 +5,7 @@ from datetime import datetime
 
 class CreditTransactionResponse(BaseModel):
     id: str
-    amount: str
+    amount: int
     transaction_type: str
     description: Optional[str] = None
     created_at: datetime

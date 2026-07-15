@@ -10,7 +10,7 @@ class CreditTransaction(Base):
     __tablename__ = "credit_transactions"
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     amount = Column(Integer, nullable=False)
     transaction_type = Column(String(50), nullable=False)
     description = Column(String(500), nullable=True)

@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { BookOpen, ChevronLeft, ChevronRight, Clock } from "lucide-react"
 import Link from "next/link"
+import { sanitizeHtml } from "@/lib/sanitizeHtml"
 
 export default function LessonDetailPage() {
   const router = useRouter()
@@ -105,11 +106,11 @@ export default function LessonDetailPage() {
             <CardContent className="p-0">
               {currentTopic?.content ? (
                 <div className="prose prose-sm max-w-none p-8 [&_h3]:mt-6 [&_h3]:mb-3 [&_h3]:text-lg [&_h3]:font-bold [&_h3]:text-[#0F172A] [&_h4]:mt-4 [&_h4]:mb-2 [&_h4]:text-base [&_h4]:font-semibold [&_h4]:text-[#0F172A] [&_p]:mb-3 [&_p]:leading-relaxed [&_p]:text-gray-700 [&_ul]:mb-4 [&_ul]:list-disc [&_ul]:pl-6 [&_ul]:space-y-1 [&_ol]:mb-4 [&_ol]:list-decimal [&_ol]:pl-6 [&_ol]:space-y-2 [&_li]:text-gray-700 [&_strong]:font-semibold [&_strong]:text-[#0F172A] [&_em]:italic [&_code]:rounded [&_code]:bg-gray-100 [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:text-sm [&_code]:text-[#2563EB] [&_table]:mb-4 [&_table]:w-full [&_table]:border-collapse [&_th]:border [&_th]:border-gray-200 [&_th]:bg-gray-50 [&_th]:p-2 [&_th]:text-left [&_th]:text-sm [&_th]:font-semibold [&_td]:border [&_td]:border-gray-200 [&_td]:p-2 [&_td]:text-sm">
-                  <div dangerouslySetInnerHTML={{ __html: currentTopic.content }} />
+                  <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(currentTopic.content) }} />
                 </div>
               ) : lesson?.content ? (
                 <div className="prose prose-sm max-w-none p-8 prose-headings:text-[#0F172A] prose-p:text-gray-700 prose-li:text-gray-700">
-                  <div dangerouslySetInnerHTML={{ __html: lesson.content }} />
+                  <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(lesson.content) }} />
                 </div>
               ) : (
                 <div className="p-8 text-center text-gray-500">

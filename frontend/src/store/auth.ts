@@ -17,14 +17,22 @@ export const useAuthStore = create<AuthState>((set) => ({
   refreshToken: null,
   isAuthenticated: false,
   setAuth: (user, token, refreshToken) => {
-    localStorage.setItem("token", token)
-    localStorage.setItem("refreshToken", refreshToken)
+    try {
+      localStorage.setItem("token", token)
+      localStorage.setItem("refreshToken", refreshToken)
+    } catch {
+      // localStorage may be unavailable (Safari private, quota exceeded)
+    }
     set({ user, token, refreshToken, isAuthenticated: true })
   },
   setUser: (user) => set({ user }),
   logout: () => {
-    localStorage.removeItem("token")
-    localStorage.removeItem("refreshToken")
+    try {
+      localStorage.removeItem("token")
+      localStorage.removeItem("refreshToken")
+    } catch {
+      // localStorage may be unavailable
+    }
     set({ user: null, token: null, refreshToken: null, isAuthenticated: false })
   },
 }))

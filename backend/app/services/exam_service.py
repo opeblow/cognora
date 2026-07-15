@@ -9,9 +9,14 @@ from app.models.subject import Subject
 from app.models.lesson import Topic, Lesson
 from app.services.question_pool_service import QuestionPoolService
 from app.services.ai_service import AIService
+import re
 from app.utils.exam_standards import EXAM_TYPE_STANDARDS, JAMB_STANDARDS
 
 
+def strip_tags(text: str) -> str:
+    if not isinstance(text, str):
+        return text
+    return re.sub(r'<[^>]+>', '', text)
 class ExamService:
     def __init__(self, db: Session):
         self.exam_repo = ExamRepository(db)
@@ -47,7 +52,7 @@ class ExamService:
 
     def _make_seed(self, user_id: str, exam_id: str, salt: str = "") -> int:
         """Create a deterministic but unique shuffle seed per user + exam."""
-        raw = f"{user_id}:{exam_id}:{salt}:{datetime.now(timezone.utc).isoformat()[:16]}"
+        raw = f"{user_id}:{exam_id}:{salt}"
         digest = hashlib.sha256(raw.encode()).hexdigest()
         return int(digest[:12], 16)
 
@@ -59,38 +64,7 @@ class ExamService:
         rng.shuffle(shuffled)
         return shuffled
 
-    def _shuffle_options(self, questions: list, user_id: str, exam_id: str) -> list:
-        """Shuffle option order within each question for additional uniqueness."""
-        seed = self._make_seed(user_id, exam_id, "options")
-        rng = random.Random(seed)
-        for q in questions:
-            options = q.options if isinstance(q.options, list) else json.loads(q.options)
-            correct = q.correct_answer
-            correct_letter = correct.strip().upper()
 
-            option_pairs = []
-            for opt in options:
-                opt = opt.strip()
-                if opt and len(opt) > 2 and opt[1] == ")":
-                    letter = opt[0].upper()
-                    text = opt[2:].strip()
-                    option_pairs.append((letter, text))
-
-            if len(option_pairs) == 4:
-                rng.shuffle(option_pairs)
-                new_labels = ["A", "B", "C", "D"]
-                new_options = [f"{nl}) {text}" for nl, (_, text) in zip(new_labels, option_pairs)]
-
-                label_map = {}
-                for old_letter, new_letter in zip([p[0] for p in option_pairs], new_labels):
-                    label_map[old_letter] = new_letter
-
-                if correct_letter in label_map:
-                    q.correct_answer = label_map[correct_letter]
-
-                q.options = new_options
-
-        return questions
 
     async def start_exam_async(self, exam_id: str, user_id: str) -> dict:
         """Async version with live question generation via Brave API."""
@@ -119,10 +93,10 @@ class ExamService:
                     for lq in live_qs:
                         eq = ExamQuestion(
                             exam_id=exam.id,
-                            text=lq["text"],
-                            options=lq["options"],
-                            correct_answer=lq["correct_answer"],
-                            explanation=lq.get("explanation", ""),
+                            text=strip_tags(lq["text"]),
+                            options=[strip_tags(opt) for opt in lq["options"]],
+                            correct_answer=strip_tags(lq["correct_answer"]),
+                            explanation=strip_tags(lq.get("explanation", "")),
                             order_index=len(questions) + 1,
                         )
                         self.db.add(eq)
@@ -139,10 +113,10 @@ class ExamService:
                     for pq in pool_questions:
                         eq = ExamQuestion(
                             exam_id=exam.id,
-                            text=pq.text,
-                            options=pq.options,
-                            correct_answer=pq.correct_answer,
-                            explanation=pq.explanation,
+                            text=strip_tags(pq.text),
+                            options=[strip_tags(opt) for opt in pq.options] if isinstance(pq.options, list) else pq.options,
+                            correct_answer=strip_tags(pq.correct_answer),
+                            explanation=strip_tags(pq.explanation),
                             order_index=len(questions) + 1,
                         )
                         self.db.add(eq)
@@ -156,8 +130,10 @@ class ExamService:
             result_id = str(result.id)
             is_new = True
 
-        questions = self._shuffle_questions(questions, user_id, exam_id)
-        questions = self._shuffle_options(questions, user_id, exam_id)
+        if not in_progress:
+            # Only shuffle the response list. Never mutate canonical ExamQuestion rows;
+            # they are shared by every learner and contain the answer key.
+            questions = self._shuffle_questions(questions, user_id, exam_id)
 
         return {
             "result_id": result_id,
@@ -184,7 +160,7 @@ class ExamService:
         }
 
     async def _fetch_live_questions(self, exam, user_id: str, needed: int) -> list[dict]:
-        """Fetch real-time exam questions using Brave API with cognitive depth focus."""
+        """Fetch real-time exam questions using AI with full syllabus coverage."""
         subject = exam.subject
         subject_name = subject.name if subject else "General"
         exam_type = exam.exam_type
@@ -197,16 +173,27 @@ class ExamService:
         )
         topic_names = [t.title for t in topics] if topics else [subject_name]
 
-        selected_topic = random.Random(f"{user_id}:{exam.id}").choice(topic_names)
+        rng = random.Random(f"{user_id}:{exam.id}")
+        num_topics = min(len(topic_names), max(1, needed // 15))
+        selected_topics = rng.sample(topic_names, num_topics) if num_topics > 1 else topic_names[:1]
 
-        questions = await self.ai_service.generate_exam_questions_for_topic(
-            subject=subject_name,
-            exam_type=exam_type,
-            topic=selected_topic,
-            num_questions=min(needed, 10),
-        )
+        all_questions = []
+        questions_per_topic = max(15, (needed + num_topics - 1) // num_topics)
 
-        return questions
+        for topic in selected_topics:
+            remaining = needed - len(all_questions)
+            if remaining <= 0:
+                break
+            batch = await self.ai_service.generate_exam_questions_for_topic(
+                subject=subject_name,
+                exam_type=exam_type,
+                topic=topic,
+                num_questions=min(remaining, questions_per_topic),
+                skip_search=True,
+            )
+            all_questions.extend(batch)
+
+        return all_questions[:needed]
 
     async def generate_live_questions(self, exam_id: str, user_id: str, num_questions: int) -> list[dict]:
         """Generate fresh questions for an exam in real-time."""
@@ -224,8 +211,6 @@ class ExamService:
                 "id": f"live_{hash(q['text'][:60])}",
                 "text": q["text"],
                 "options": q["options"],
-                "correct_answer": q["correct_answer"],
-                "explanation": q.get("explanation", ""),
                 "difficulty": q.get("difficulty", "hard"),
                 "cognitive_level": q.get("cognitive_level", "analysis"),
             }
@@ -261,10 +246,10 @@ class ExamService:
                 for pq in pool_questions:
                     eq = ExamQuestion(
                         exam_id=exam.id,
-                        text=pq.text,
-                        options=pq.options,
-                        correct_answer=pq.correct_answer,
-                        explanation=pq.explanation,
+                        text=strip_tags(pq.text),
+                        options=[strip_tags(opt) for opt in pq.options] if isinstance(pq.options, list) else pq.options,
+                        correct_answer=strip_tags(pq.correct_answer),
+                        explanation=strip_tags(pq.explanation),
                         order_index=len(questions) + 1,
                     )
                     self.db.add(eq)
@@ -278,7 +263,8 @@ class ExamService:
             result_id = str(result.id)
             is_new = True
 
-        random.shuffle(questions)
+        if not in_progress:
+            random.shuffle(questions)
 
         return {
             "result_id": result_id,
@@ -317,14 +303,21 @@ class ExamService:
             raise ValueError("Exam not found")
 
         questions = exam.questions
-        random.Random(42).shuffle(questions)
         total = len(questions)
         score = 0
         answer_details = []
 
+        def extract_letter(text):
+            text = text.strip().upper() if text else ""
+            if text and len(text) >= 2 and text[1] == ')':
+                return text[0]
+            return text
+
         for question in questions:
-            selected = answers.get(str(question.id))
-            is_correct = selected == question.correct_answer
+            selected = answers.get(str(question.id)) or ""
+            correct_letter = extract_letter(question.correct_answer)
+            selected_letter = extract_letter(selected)
+            is_correct = selected_letter == correct_letter
             if is_correct:
                 score += 1
 

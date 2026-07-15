@@ -4,8 +4,8 @@ export interface User {
   full_name: string
   avatar_url: string | null
   is_verified: boolean
-  credits: string
-  learning_streak: string
+  credits: number
+  learning_streak: number
 }
 
 export interface AuthResponse {
@@ -31,8 +31,8 @@ export interface Quiz {
   title: string
   description: string | null
   difficulty: string | null
-  time_limit_minutes: string | null
-  pass_percentage: string | null
+  time_limit_minutes: number | null
+  pass_percentage: number | null
   subject?: Subject
 }
 
@@ -40,13 +40,15 @@ export interface Question {
   id: string
   text: string
   options: string[]
-  order_index: string | null
+  order_index: number | null
   question_type: string
   correct_answer?: string
   explanation?: string
 }
 
 export interface QuizDetail extends Quiz {
+  session_id: string
+  question_count: number
   questions: Question[]
 }
 
@@ -99,8 +101,8 @@ export interface StartExamResponse {
     description: string | null
     exam_type: string
     year: string | null
-    time_limit_minutes: string | null
-    pass_percentage: string | null
+    time_limit_minutes: number | null
+    pass_percentage: number | null
     questions: Question[]
   }
   time_limit_minutes: number
@@ -149,7 +151,7 @@ export interface CreditBalance {
 
 export interface CreditTransaction {
   id: string
-  amount: string
+  amount: number
   transaction_type: string
   description: string | null
   created_at: string

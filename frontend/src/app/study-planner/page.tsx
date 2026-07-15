@@ -90,7 +90,7 @@ export default function StudyPlannerPage() {
         title: planTitle.trim(),
         plan_type: "custom",
         start_date: new Date().toISOString().split("T")[0],
-        end_date: new Date(Date.now() + parseInt(durationDays) * 86400000).toISOString().split("T")[0],
+        end_date: new Date(Date.now() + (parseInt(durationDays) || 14) * 86400000).toISOString().split("T")[0],
         subjects: selectedSubjects,
         use_ai: useAI,
       })

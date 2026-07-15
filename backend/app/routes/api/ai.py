@@ -30,6 +30,10 @@ def tutor_chat(
         result = ai_service.tutor_chat(request.message, request.subject, request.context)
         return TutorResponse(**result)
     except ValueError as e:
+        try:
+            credit_service.add_credits(str(current_user.id), 1, description="AI tutor failed — refund")
+        except Exception:
+            pass
         raise HTTPException(status_code=502, detail=str(e))
 
 
@@ -50,4 +54,8 @@ def generate_quiz(
         result = ai_service.generate_quiz(request.subject, request.topic, request.difficulty, request.num_questions)
         return result
     except ValueError as e:
+        try:
+            credit_service.add_credits(str(current_user.id), 2, description="Quiz generation failed — refund")
+        except Exception:
+            pass
         raise HTTPException(status_code=502, detail=str(e))

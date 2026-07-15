@@ -26,7 +26,7 @@ class Question(Base):
     __tablename__ = "questions"
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    quiz_id = Column(String, ForeignKey("quizzes.id", ondelete="CASCADE"), nullable=False)
+    quiz_id = Column(String, ForeignKey("quizzes.id", ondelete="CASCADE"), nullable=False, index=True)
     text = Column(Text, nullable=False)
     options = Column(JSON, nullable=False)
     correct_answer = Column(String(50), nullable=False)
@@ -42,7 +42,7 @@ class QuizAttempt(Base):
     __tablename__ = "quiz_attempts"
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    quiz_id = Column(String, ForeignKey("quizzes.id", ondelete="CASCADE"), nullable=False)
+    quiz_id = Column(String, ForeignKey("quizzes.id", ondelete="CASCADE"), nullable=False, index=True)
     user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     score = Column(String(50), nullable=True)
     total = Column(String(50), nullable=True)
@@ -60,8 +60,8 @@ class QuizAnswer(Base):
     __tablename__ = "quiz_answers"
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    attempt_id = Column(String, ForeignKey("quiz_attempts.id", ondelete="CASCADE"), nullable=False)
-    question_id = Column(String, ForeignKey("questions.id", ondelete="CASCADE"), nullable=True)
+    attempt_id = Column(String, ForeignKey("quiz_attempts.id", ondelete="CASCADE"), nullable=False, index=True)
+    question_id = Column(String, ForeignKey("questions.id", ondelete="CASCADE"), nullable=True, index=True)
     pool_question_id = Column(String, ForeignKey("question_pool.id", ondelete="CASCADE"), nullable=True)
     selected_answer = Column(String(50), nullable=False)
     is_correct = Column(Boolean, default=False)

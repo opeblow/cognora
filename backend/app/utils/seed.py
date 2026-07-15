@@ -1,10 +1,8 @@
-from sqlalchemy.orm import Session
 from app.database.base import SessionLocal, engine, Base
 from app.models.subject import Subject
 from app.models.lesson import Lesson, Topic
-from app.models.quiz import Quiz, Question
-from app.models.exam import Exam, ExamQuestion
-from app.models.question_pool import QuestionPool
+from app.models.quiz import Quiz
+from app.models.exam import Exam
 from app.utils.seed_data import SUBJECTS_DATA
 from app.utils.exam_standards import JAMB_STANDARDS, WAEC_STANDARDS
 
@@ -45,48 +43,15 @@ def seed_database():
             jamb_std = JAMB_STANDARDS.get(subject.slug)
             waec_std = WAEC_STANDARDS.get(subject.slug)
 
-            if subject.slug == "mathematics":
-                quiz = Quiz(
-                    subject_id=subject.id,
-                    title="Algebra Basics Quiz",
-                    description="Test your understanding of basic algebra concepts",
-                    difficulty="easy",
-                    time_limit_minutes=15,
-                    pass_percentage=50,
-                )
-                db.add(quiz)
-                db.flush()
-
-                questions = [
-                    Question(quiz_id=quiz.id, text="What is the value of x in 2x + 5 = 15?", options=["A) 5", "B) 10", "C) 7.5", "D) 20"], correct_answer="A", explanation="2x + 5 = 15, so 2x = 10, therefore x = 5", question_type="multiple_choice", order_index=1),
-                    Question(quiz_id=quiz.id, text="Simplify: 3(a + 2b) - 2(a - b)", options=["A) a + 8b", "B) a + 4b", "C) 5a + 4b", "D) a - 4b"], correct_answer="A", explanation="3(a + 2b) - 2(a - b) = 3a + 6b - 2a + 2b = a + 8b", question_type="multiple_choice", order_index=2),
-                    Question(quiz_id=quiz.id, text="Which of the following is a variable?", options=["A) 5", "B) x", "C) 10", "D) 100"], correct_answer="B", explanation="A variable is a symbol that represents an unknown value", question_type="multiple_choice", order_index=3),
-                    Question(quiz_id=quiz.id, text="Solve: 4x - 7 = 13", options=["A) 5", "B) 1.5", "C) 20", "D) -5"], correct_answer="A", explanation="4x - 7 = 13, 4x = 20, x = 5", question_type="multiple_choice", order_index=4),
-                    Question(quiz_id=quiz.id, text="What is the coefficient in 5x²?", options=["A) 2", "B) x", "C) 5", "D) x²"], correct_answer="C", explanation="The coefficient is the numerical factor multiplying the variable", question_type="multiple_choice", order_index=5),
-                ]
-                for q in questions:
-                    db.add(q)
-
-                db.commit()
-
             quiz = Quiz(
                 subject_id=subject.id,
                 title=f"{subject.name} Practice Quiz",
-                description=f"Test your knowledge of {subject.name}",
+                description=f"Test your knowledge of {subject.name} with 60 AI-generated WAEC/JAMB-standard questions",
                 difficulty="medium",
-                time_limit_minutes=15,
+                time_limit_minutes=6,
                 pass_percentage=50,
             )
             db.add(quiz)
-            db.flush()
-
-            qs = [
-                Question(quiz_id=quiz.id, text=f"Sample question about {subject.name}?", options=["A) Option A", "B) Option B", "C) Option C", "D) Option D"], correct_answer="A", explanation=f"Explanation for the {subject.name} question.", question_type="multiple_choice", order_index=1),
-                Question(quiz_id=quiz.id, text=f"Second question about {subject.name}?", options=["A) Option A", "B) Option B", "C) Option C", "D) Option D"], correct_answer="B", explanation=f"Explanation for the {subject.name} question.", question_type="multiple_choice", order_index=2),
-                Question(quiz_id=quiz.id, text=f"Third question about {subject.name}?", options=["A) Option A", "B) Option B", "C) Option C", "D) Option D"], correct_answer="C", explanation=f"Explanation for the {subject.name} question.", question_type="multiple_choice", order_index=3),
-            ]
-            for q in qs:
-                db.add(q)
 
             for exam_type, standards in [("JAMB", jamb_std), ("WAEC", waec_std)]:
                 if not standards:

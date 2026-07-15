@@ -20,7 +20,11 @@ class ContentStorage:
         cache_key = f"content:topic:{topic_id}"
         cached = await r.get(cache_key)
         if cached:
-            return json.loads(cached)
+            try:
+                return json.loads(cached)
+            except (json.JSONDecodeError, TypeError):
+                logger.warning(f"Invalid cached content for topic {topic_id}, ignoring")
+                await r.delete(cache_key)
 
         topic = self.db.query(Topic).filter(Topic.id == topic_id).first()
         if not topic:
@@ -58,7 +62,11 @@ class ContentStorage:
         key = f"progress:topic:{user_id}:{topic_id}"
         data = await r.get(key)
         if data:
-            return json.loads(data)
+            try:
+                return json.loads(data)
+            except (json.JSONDecodeError, TypeError):
+                logger.warning(f"Invalid cached progress for {user_id}:{topic_id}, ignoring")
+                pass
 
         return {
             "topic_id": topic_id,
@@ -89,7 +97,11 @@ class ContentStorage:
         cache_key = f"content:deepdive:{deep_dive_id}"
         cached = await r.get(cache_key)
         if cached:
-            return json.loads(cached)
+            try:
+                return json.loads(cached)
+            except (json.JSONDecodeError, TypeError):
+                logger.warning(f"Invalid cached deep dive {deep_dive_id}, ignoring")
+                await r.delete(cache_key)
         return None
 
     async def cache_deep_dive(self, deep_dive_id: str, content: dict):

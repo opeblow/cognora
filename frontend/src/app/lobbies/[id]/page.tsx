@@ -32,6 +32,8 @@ export default function LobbyDetailPage() {
     if (!isAuthenticated) router.push("/login")
   }, [isAuthenticated, router])
 
+  const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
   const { data: lobby, isLoading } = useQuery({
     queryKey: ["lobby", lobbyId],
     queryFn: () => lobbyService.getById(lobbyId),
@@ -92,12 +94,25 @@ export default function LobbyDetailPage() {
 
     ws.onclose = () => {
       setConnected(false)
+      if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current)
+      reconnectTimeoutRef.current = setTimeout(() => {
+        reconnectTimeoutRef.current = null
+      }, 5000)
     }
 
     return () => {
+      if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current)
       ws.close()
     }
   }, [lobbyId, lobby?.is_active, user])
+
+  useEffect(() => {
+    if (!connected && lobbyId && lobby?.is_active && reconnectTimeoutRef.current === null) {
+      reconnectTimeoutRef.current = setTimeout(() => {
+        reconnectTimeoutRef.current = null
+      }, 5000)
+    }
+  }, [connected, lobbyId, lobby?.is_active])
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })

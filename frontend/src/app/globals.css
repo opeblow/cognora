@@ -1,33 +1,92 @@
 @import "tailwindcss";
 
-@layer base {
-  :root {
-    --background: #FFFFFF;
-    --foreground: #0F172A;
-    --primary: #2563EB;
-    --primary-foreground: #FFFFFF;
-    --secondary: #F8FAFC;
-    --secondary-foreground: #0F172A;
-    --accent: #14B8A6;
-    --accent-foreground: #FFFFFF;
-    --muted: #F1F5F9;
-    --muted-foreground: #64748B;
-    --border: #E2E8F0;
-    --ring: #2563EB;
-  }
+@theme {
+  --color-ink: #16211C;
+  --color-ink-light: #1E2E26;
+  --color-ink-lighter: #263B31;
+  --color-paper: #FBF6E9;
+  --color-paper-dark: #F0E8D4;
+  --color-amber: #C9932E;
+  --color-amber-hover: #B8841F;
+  --color-moss: #4B6152;
+  --color-moss-light: #5C7566;
+  --color-coral: #D6572B;
+  --color-coral-hover: #C04A22;
+  --color-cream: #F3EEE0;
+  --color-cream-dim: #D9D2C0;
+
+  --font-serif: "Fraunces", Georgia, serif;
+  --font-sans: "Inter", system-ui, sans-serif;
+  --font-hand: "Caveat", cursive;
 }
 
 @layer base {
   * {
-    @apply border-gray-200;
+    border-color: #2A3D33;
   }
+
   body {
-    @apply bg-white text-[#0F172A] antialiased;
+    @apply bg-ink text-cream antialiased;
+    font-family: var(--font-sans);
+  }
+
+  ::selection {
+    background-color: #C9932E33;
+    color: #FBF6E9;
+  }
+
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-amber;
   }
 }
 
 @layer utilities {
   .text-balance {
     text-wrap: balance;
+  }
+}
+
+/* Notebook animation keyframes */
+@keyframes notebook-write {
+  0% { width: 0%; }
+  100% { width: 100%; }
+}
+
+@keyframes pencil-sweep {
+  0% { transform: translateX(0); opacity: 1; }
+  90% { opacity: 1; }
+  100% { transform: translateX(280px); opacity: 0; }
+}
+
+@keyframes page-turn {
+  0% { transform: rotateY(0deg); }
+  100% { transform: rotateY(-180deg); }
+}
+
+@keyframes fade-in-line {
+  0% { opacity: 0; transform: translateY(4px); }
+  20% { opacity: 1; transform: translateY(0); }
+  85% { opacity: 1; }
+  100% { opacity: 1; }
+}
+
+@keyframes marquee-scroll {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+@keyframes marquee-scroll-reverse {
+  0% { transform: translateX(-50%); }
+  100% { transform: translateX(0); }
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }

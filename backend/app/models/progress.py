@@ -10,8 +10,8 @@ class UserProgress(Base):
     __tablename__ = "user_progress"
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    subject_id = Column(String, ForeignKey("subjects.id", ondelete="CASCADE"), nullable=False)
+    user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    subject_id = Column(String, ForeignKey("subjects.id", ondelete="CASCADE"), nullable=False, index=True)
     lessons_completed = Column(String(50), default="0")
     quizzes_taken = Column(String(50), default="0")
     average_score = Column(String(50), default="0")

@@ -1,4 +1,6 @@
 import logging
+import hashlib
+import hmac
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from app.database.base import get_db
@@ -52,16 +54,29 @@ def initiate_purchase(
 
 @router.post("/webhook", response_model=dict)
 async def handle_webhook(request: Request, db: Session = Depends(get_db)):
-    payload = await request.json()
+    raw_body = await request.body()
+    signature = request.headers.get("x-paystack-signature", "")
+    secret = PaystackService.get_webhook_secret()
+    if not secret:
+        logger.error("PAYSTACK_SECRET_KEY is not configured — webhook validation disabled")
+        raise HTTPException(status_code=500, detail="Webhook secret not configured")
+    expected = hmac.new(secret.encode(), raw_body, hashlib.sha512).hexdigest()
+    if not signature or not hmac.compare_digest(signature, expected):
+        raise HTTPException(status_code=401, detail="Invalid webhook signature")
+    try:
+        payload = await request.json()
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid webhook payload")
     paystack = PaystackService(db)
     try:
         success = paystack.handle_webhook(payload)
         if success:
             return {"status": "ok"}
         return {"status": "ignored"}
-    except Exception as e:
-        logger.error(f"Webhook handling failed: {e}")
-        return {"status": "error"}
+    except Exception:
+        db.rollback()
+        logger.exception("Webhook handling failed")
+        raise HTTPException(status_code=500, detail="Webhook processing failed")
 
 
 @router.get("/verify/{reference}", response_model=dict)
@@ -71,6 +86,8 @@ def verify_payment(
     db: Session = Depends(get_db),
 ):
     paystack = PaystackService(db)
+    if not paystack.get_payment_for_user(reference, str(current_user.id)):
+        raise HTTPException(status_code=404, detail="Transaction not found")
     result = paystack.verify_transaction(reference)
     if not result:
         raise HTTPException(status_code=404, detail="Transaction not found or not completed")

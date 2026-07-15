@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime, timezone
-from sqlalchemy import Column, String, Text, Boolean, Integer, DateTime, ForeignKey, JSON
+from sqlalchemy import Column, String, Text, Boolean, Integer, DateTime, ForeignKey, JSON, UniqueConstraint
 from sqlalchemy.orm import relationship
 from app.database.base import Base
 
@@ -42,9 +42,12 @@ class ExamQuestion(Base):
 
 class ExamResult(Base):
     __tablename__ = "exam_results"
+    __table_args__ = (
+        UniqueConstraint("user_id", "exam_id", "status", name="uq_one_in_progress_per_user_exam"),
+    )
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    exam_id = Column(String, ForeignKey("exams.id", ondelete="CASCADE"), nullable=False)
+    exam_id = Column(String, ForeignKey("exams.id", ondelete="CASCADE"), nullable=False, index=True)
     user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     score = Column(String(50), nullable=True)
     total = Column(String(50), nullable=True)
@@ -63,8 +66,8 @@ class ExamAnswer(Base):
     __tablename__ = "exam_answers"
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    result_id = Column(String, ForeignKey("exam_results.id", ondelete="CASCADE"), nullable=False)
-    question_id = Column(String, ForeignKey("exam_questions.id", ondelete="CASCADE"), nullable=False)
+    result_id = Column(String, ForeignKey("exam_results.id", ondelete="CASCADE"), nullable=False, index=True)
+    question_id = Column(String, ForeignKey("exam_questions.id", ondelete="CASCADE"), nullable=False, index=True)
     selected_answer = Column(String(50), nullable=True)
     is_correct = Column(Boolean, default=False)
 

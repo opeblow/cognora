@@ -14,8 +14,12 @@ class BaseRepository(Generic[ModelType]):
     def create(self, **kwargs) -> ModelType:
         instance = self.model(**kwargs)
         self.db.add(instance)
-        self.db.commit()
-        self.db.refresh(instance)
+        try:
+            self.db.commit()
+            self.db.refresh(instance)
+        except Exception:
+            self.db.rollback()
+            raise
         return instance
 
     def get(self, id: Any) -> Optional[ModelType]:
@@ -32,7 +36,7 @@ class BaseRepository(Generic[ModelType]):
             if hasattr(self.model, key) and value is not None:
                 count_query = count_query.where(getattr(self.model, key) == value)
         total = self.db.execute(count_query).scalar() or 0
-        query = query.offset(skip).limit(limit)
+        query = query.order_by(self.model.id).offset(skip).limit(limit)
         items = list(self.db.execute(query).scalars().all())
         return items, total
 
@@ -41,10 +45,14 @@ class BaseRepository(Generic[ModelType]):
         if not instance:
             return None
         for key, value in kwargs.items():
-            if hasattr(instance, key) and value is not None:
+            if hasattr(instance, key):
                 setattr(instance, key, value)
-        self.db.commit()
-        self.db.refresh(instance)
+        try:
+            self.db.commit()
+            self.db.refresh(instance)
+        except Exception:
+            self.db.rollback()
+            raise
         return instance
 
     def delete(self, id: Any) -> bool:
@@ -52,5 +60,9 @@ class BaseRepository(Generic[ModelType]):
         if not instance:
             return False
         self.db.delete(instance)
-        self.db.commit()
+        try:
+            self.db.commit()
+        except Exception:
+            self.db.rollback()
+            raise
         return True

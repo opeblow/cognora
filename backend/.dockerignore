@@ -13,3 +13,7 @@ README.md
 tests/
 uploads/*
 !uploads/.gitkeep
+check_401s.py
+debug_401.py
+test_full_api.py
+app/utils/seed_data.py

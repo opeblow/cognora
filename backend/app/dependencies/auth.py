@@ -21,6 +21,9 @@ def get_current_user(
             detail="Invalid or expired token",
         )
 
+    if payload.get("type") != "access":
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Access token required")
+
     user_id = payload.get("sub")
     user_repo = UserRepository(db)
     user = user_repo.get(user_id)

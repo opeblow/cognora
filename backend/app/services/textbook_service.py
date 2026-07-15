@@ -78,6 +78,8 @@ class TextbookService:
         section_index: int,
         previous_sections: list[str],
     ) -> str:
+        if section_index < 0 or section_index >= len(self.sections):
+            section_index = 0
         section = self.sections[section_index]
         prev_context = ""
         if previous_sections:

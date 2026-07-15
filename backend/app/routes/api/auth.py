@@ -1,6 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from urllib.parse import urlencode
+import secrets
+import hmac
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
@@ -51,7 +53,10 @@ def verify_email(request: VerifyEmailRequest, db: Session = Depends(get_db)):
 @router.post("/forgot-password", response_model=dict)
 def forgot_password(request: ForgotPasswordRequest, db: Session = Depends(get_db)):
     service = AuthService(db)
-    service.forgot_password(request.email)
+    try:
+        service.forgot_password(request.email)
+    except Exception:
+        pass
     return {"message": "If the email exists, a reset link has been sent"}
 
 
@@ -104,22 +109,27 @@ def get_me(current_user: User = Depends(get_current_user)):
 
 @router.get("/google/login")
 def google_login():
-    auth_url = AuthService.get_google_auth_url()
-    return {"auth_url": auth_url}
+    state = secrets.token_urlsafe(32)
+    response = RedirectResponse(url=AuthService.get_google_auth_url(state), status_code=302)
+    response.set_cookie("oauth_state", state, max_age=600, httponly=True, secure=not settings.DEBUG, samesite="lax")
+    return response
 
 
 @router.get("/google/callback")
-def google_callback(code: str, error: str = None, db: Session = Depends(get_db)):
+def google_callback(code: str | None = None, state: str | None = None, error: str | None = None, request: Request = None, db: Session = Depends(get_db)):
     service = AuthService(db)
     if error:
         raise HTTPException(status_code=400, detail="Google OAuth failed")
+    expected_state = request.cookies.get("oauth_state") if request else None
+    if not code or not expected_state or not state or not hmac.compare_digest(expected_state, state):
+        raise HTTPException(status_code=400, detail="Invalid OAuth state")
     try:
         result = service.google_auth(code)
-        params = urlencode({
-            "token": result["access_token"],
-            "refresh_token": result["refresh_token"],
-        })
         frontend_url = settings.APP_URL or "http://localhost:3000"
-        return RedirectResponse(url=f"{frontend_url}/auth/callback?{params}")
+        response = RedirectResponse(url=f"{frontend_url}/auth/callback")
+        response.set_cookie("access_token", result["access_token"], max_age=1800, secure=not settings.DEBUG, samesite="lax")
+        response.set_cookie("refresh_token", result["refresh_token"], max_age=86400*7, secure=not settings.DEBUG, samesite="lax")
+        response.delete_cookie("oauth_state")
+        return response
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

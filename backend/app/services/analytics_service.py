@@ -77,13 +77,23 @@ class AnalyticsService:
         for p in progress:
             subject = self.subject_repo.get(p.subject_id)
             if subject:
+                def safe_int(v):
+                    try:
+                        return int(v) if v is not None else 0
+                    except (ValueError, TypeError):
+                        return 0
+                def safe_float(v):
+                    try:
+                        return float(v) if v is not None else 0.0
+                    except (ValueError, TypeError):
+                        return 0.0
                 subject_stats.append({
                     "subject_id": str(p.subject_id),
                     "subject_name": subject.name,
-                    "lessons_completed": int(p.lessons_completed or "0"),
-                    "quizzes_taken": int(p.quizzes_taken or "0"),
-                    "average_score": float(p.average_score or "0"),
-                    "total_study_time_minutes": int(p.total_study_time_minutes or "0"),
+                    "lessons_completed": safe_int(p.lessons_completed),
+                    "quizzes_taken": safe_int(p.quizzes_taken),
+                    "average_score": safe_float(p.average_score),
+                    "total_study_time_minutes": safe_int(p.total_study_time_minutes),
                     "mastery_percentage": self._calculate_mastery(p),
                 })
 
@@ -205,6 +215,11 @@ class AnalyticsService:
 
     def _get_topic_mastery(self, user_id: str) -> list[dict]:
         """Per-subject topic mastery based on quiz performance and study completion."""
+        def safe_int(v):
+            try:
+                return int(v) if v is not None else 0
+            except (ValueError, TypeError):
+                return 0
         progress = self.progress_repo.get_by_user(user_id)
         mastery = []
 
@@ -217,11 +232,6 @@ class AnalyticsService:
                 self.db.query(QuizAttempt)
                 .filter(
                     QuizAttempt.user_id == user_id,
-                    QuizAttempt.quiz_id.in_(
-                        select(QuizAttempt.quiz_id).where(
-                            QuizAttempt.user_id == user_id
-                        )
-                    )
                 )
                 .all()
             )
@@ -241,7 +251,7 @@ class AnalyticsService:
                         pass
 
             avg_quiz = sum(quiz_scores) / len(quiz_scores) if quiz_scores else 0
-            lessons_done = int(p.lessons_completed or "0")
+            lessons_done = safe_int(p.lessons_completed)
             study_completion = min(100, (lessons_done / total_lessons) * 100)
 
             mastery_breakdown = {
@@ -266,8 +276,14 @@ class AnalyticsService:
 
     def _calculate_mastery(self, progress) -> float:
         """Quick mastery calculation for per-subject stats."""
-        avg_score = float(progress.average_score or "0")
-        lessons = int(progress.lessons_completed or "0")
+        try:
+            avg_score = float(progress.average_score) if progress.average_score else 0.0
+        except (ValueError, TypeError):
+            avg_score = 0.0
+        try:
+            lessons = int(progress.lessons_completed) if progress.lessons_completed else 0
+        except (ValueError, TypeError):
+            lessons = 0
         return round(avg_score * 0.7 + min(lessons * 5, 30), 1)
 
     def log_event(self, user_id: str, event_type: str, event_data: Optional[dict] = None):

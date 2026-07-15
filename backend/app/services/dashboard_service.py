@@ -31,13 +31,29 @@ class DashboardService:
         for p in progress:
             subject = self.subject_repo.get(p.subject_id)
             if subject:
+                try:
+                    lessons_completed = int(p.lessons_completed) if p.lessons_completed else 0
+                except (ValueError, TypeError):
+                    lessons_completed = 0
+                try:
+                    quizzes_taken = int(p.quizzes_taken) if p.quizzes_taken else 0
+                except (ValueError, TypeError):
+                    quizzes_taken = 0
+                try:
+                    average_score = float(p.average_score) if p.average_score else 0.0
+                except (ValueError, TypeError):
+                    average_score = 0.0
+                try:
+                    total_study_time = int(p.total_study_time_minutes) if p.total_study_time_minutes else 0
+                except (ValueError, TypeError):
+                    total_study_time = 0
                 subject_stats.append({
                     "subject_id": str(p.subject_id),
                     "subject_name": subject.name,
-                    "lessons_completed": int(p.lessons_completed or "0"),
-                    "quizzes_taken": int(p.quizzes_taken or "0"),
-                    "average_score": float(p.average_score or "0"),
-                    "total_study_time_minutes": int(p.total_study_time_minutes or "0"),
+                    "lessons_completed": lessons_completed,
+                    "quizzes_taken": quizzes_taken,
+                    "average_score": average_score,
+                    "total_study_time_minutes": total_study_time,
                 })
 
         strong = sorted(subject_stats, key=lambda x: x["average_score"], reverse=True)[:3]

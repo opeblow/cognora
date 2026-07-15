@@ -7,8 +7,8 @@ const mockUser: User = {
   email: "test@example.com",
   full_name: "Test User",
   is_verified: true,
-  credits: "50",
-  learning_streak: "3",
+  credits: 50,
+  learning_streak: 3,
   avatar_url: null,
 }
 

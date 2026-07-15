@@ -28,9 +28,10 @@ export default function ExamDetailPage() {
   const [result, setResult] = useState<SubmitQuizResponse | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [fetchingLive, setFetchingLive] = useState(false)
+  const mountedRef = useRef(true)
   const [examData, setExamData] = useState<{
     result_id: string
-    exam: { id: string; title: string; description: string | null; exam_type: string; time_limit_minutes: string | null; pass_percentage: string | null; questions: { id: string; text: string; options: string[] }[] }
+    exam: { id: string; title: string; description: string | null; exam_type: string; time_limit_minutes: number | null; pass_percentage: number | null; questions: { id: string; text: string; options: string[] }[] }
     time_limit_minutes: number
   } | null>(null)
   const [liveQuestions, setLiveQuestions] = useState<LiveQuestion[]>([])
@@ -42,11 +43,14 @@ export default function ExamDetailPage() {
       return
     }
 
+    mountedRef.current = true
     const startExam = async () => {
       try {
         const data = await examService.start(examId)
-        setExamData(data)
-        setTimeLeft(data.time_limit_minutes * 60)
+        if (mountedRef.current) {
+          setExamData(data)
+          setTimeLeft(data.time_limit_minutes * 60)
+        }
       } catch (err: unknown) {
         const error = err as { message?: string }
         toast.error(error.message || "Failed to start exam")
@@ -54,10 +58,11 @@ export default function ExamDetailPage() {
           router.push("/credits")
         }
       } finally {
-        setLoading(false)
+        if (mountedRef.current) setLoading(false)
       }
     }
     startExam()
+    return () => { mountedRef.current = false }
   }, [isAuthenticated, examId, router])
 
   const handleFetchLiveQuestions = async () => {
@@ -89,12 +94,12 @@ export default function ExamDetailPage() {
         answers,
         time_taken_seconds: Math.floor((Date.now() - startTime) / 1000),
       })
-      setResult(res)
+      if (mountedRef.current) setResult(res)
     } catch (error: unknown) {
       const err = error as { message?: string }
       toast.error(err.message || "Failed to submit exam")
     } finally {
-      setSubmitting(false)
+      if (mountedRef.current) setSubmitting(false)
     }
   }
 

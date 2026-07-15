@@ -25,7 +25,7 @@ class LobbyMessage(Base):
     __tablename__ = "lobby_messages"
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    lobby_id = Column(String, ForeignKey("study_lobbies.id", ondelete="CASCADE"), nullable=False)
+    lobby_id = Column(String, ForeignKey("study_lobbies.id", ondelete="CASCADE"), nullable=False, index=True)
     user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=True)
     username = Column(String(255), nullable=True)
     content = Column(Text, nullable=False)

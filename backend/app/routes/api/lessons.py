@@ -200,4 +200,8 @@ def expand_topic_content(
 
         return {"content": generated, "expanded": True, "subject": subject.name, "topic": topic.title}
     except ValueError as e:
+        try:
+            credit_service.add_credits(str(current_user.id), 1, description="Content expansion failed — refund")
+        except Exception:
+            pass
         raise HTTPException(status_code=502, detail=str(e))

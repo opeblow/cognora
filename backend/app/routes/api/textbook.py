@@ -174,4 +174,8 @@ async def generate_section(
             has_more=section_index < len(sections) - 1,
         )
     except ValueError as e:
+        try:
+            credit_service.add_credits(str(current_user.id), 1, description="Textbook generation failed — refund")
+        except Exception:
+            pass
         raise HTTPException(status_code=502, detail=str(e))

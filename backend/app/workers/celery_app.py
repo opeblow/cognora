@@ -33,5 +33,10 @@ celery_app.conf.update(
             "schedule": 43200,  # 12 hours
             "args": (),
         },
+        "pre-generate-question-pool": {
+            "task": "app.workers.tasks.pre_generate_question_pool",
+            "schedule": 3600,  # 1 hour
+            "args": (),
+        },
     },
 )

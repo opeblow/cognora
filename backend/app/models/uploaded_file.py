@@ -9,7 +9,7 @@ class UploadedFile(Base):
     __tablename__ = "uploaded_files"
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     original_filename = Column(String(500), nullable=False)
     stored_filename = Column(String(500), nullable=False)
     mime_type = Column(String(100), nullable=False)

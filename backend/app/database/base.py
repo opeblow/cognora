@@ -9,6 +9,7 @@ engine = create_engine(
     max_overflow=settings.DB_MAX_OVERFLOW,
     pool_recycle=3600,
     pool_use_lifo=True,
+    pool_timeout=30,
     connect_args={"connect_timeout": 10},
 )
 

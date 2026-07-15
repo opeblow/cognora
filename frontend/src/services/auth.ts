@@ -23,5 +23,5 @@ export const authService = {
   changePassword: (data: { current_password: string; new_password: string }) =>
     api.post<{ message: string }>("/auth/change-password", data),
 
-  getMe: () => api.get<{ id: string; email: string; full_name: string; avatar_url: string | null; is_verified: boolean; credits: string; learning_streak: string }>("/auth/me"),
+  getMe: () => api.get<{ id: string; email: string; full_name: string; avatar_url: string | null; is_verified: boolean; credits: number; learning_streak: number }>("/auth/me"),
 }

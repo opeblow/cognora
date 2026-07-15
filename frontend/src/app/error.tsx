@@ -1,12 +1,6 @@
 "use client"
 
-export default function RootError({
-  error,
-  reset,
-}: {
-  error: Error & { digest?: string }
-  reset: () => void
-}) {
+export default function RootError({ reset }: { reset: () => void }) {
   return (
     <div className="flex min-h-screen items-center justify-center bg-white">
       <div className="max-w-md text-center">

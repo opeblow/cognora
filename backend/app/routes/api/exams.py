@@ -35,15 +35,30 @@ async def start_exam(
     db: Session = Depends(get_db),
 ):
     service = ExamService(db)
+    credit_service = CreditService(db)
+    user_id = str(current_user.id)
+
     try:
-        result = await service.start_exam_async(exam_id, str(current_user.id))
-        if result.get("is_new"):
-            credit_service = CreditService(db)
+        in_progress = service.exam_result_repo.get_in_progress(user_id, exam_id)
+        is_new = in_progress is None
+
+        if is_new:
             try:
-                credit_service.deduct_credits(str(current_user.id), "mock_exam")
+                credit_service.deduct_credits(user_id, "mock_exam")
             except ValueError as e:
                 raise HTTPException(status_code=402, detail=str(e))
+
+        result = await service.start_exam_async(exam_id, user_id)
+
+        if is_new and not result.get("is_new"):
+            try:
+                credit_service.add_credits(user_id, 10, description="Exam start failed — refund")
+            except Exception:
+                pass
+
         return result
+    except HTTPException:
+        raise
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
@@ -78,14 +93,7 @@ async def generate_exam_questions(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Generate fresh exam questions in real-time using Brave API + AI."""
-    service = ExamService(db)
-    try:
-        questions = await service.generate_live_questions(
-            exam_id=exam_id,
-            user_id=str(current_user.id),
-            num_questions=num_questions,
-        )
-        return {"questions": questions, "generated": len(questions)}
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+    # Live questions were never included in the persisted attempt and therefore
+    # could not be scored safely. Keep the route disabled until per-attempt
+    # snapshots are introduced.
+    raise HTTPException(status_code=410, detail="Live question generation is temporarily unavailable")

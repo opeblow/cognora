@@ -97,13 +97,14 @@ class StudyPlanService:
         if total_days <= 0:
             total_days = 1
 
+        MAX_TASKS = 500
         tasks = []
         day_offset = 0
 
         subject_cycle = subjects.copy()
         random.Random(str(start_date)).shuffle(subject_cycle)
 
-        days_per_subject = max(1, total_days // len(subjects))
+        days_per_subject = min(max(1, total_days // len(subjects)), 30)
         review_intervals = [1, 3, 7]
 
         for subj_idx, subject_name in enumerate(subject_cycle):
@@ -135,7 +136,12 @@ class StudyPlanService:
                     "duration_minutes": str(session_minutes),
                 })
 
+                if len(tasks) >= MAX_TASKS:
+                    break
+
                 for interval in review_intervals:
+                    if len(tasks) >= MAX_TASKS:
+                        break
                     review_date = current_date + timedelta(days=interval)
                     if review_date <= end_date:
                         tasks.append({
@@ -146,6 +152,9 @@ class StudyPlanService:
                         })
 
                 day_offset += 1
+
+            if len(tasks) >= MAX_TASKS:
+                break
 
         tasks.sort(key=lambda t: t["date"])
 

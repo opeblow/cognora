@@ -8,6 +8,7 @@ from app.models.user import User
 from app.utils.email import EmailService
 from typing import Optional
 import secrets
+import hmac
 
 
 class AuthService:
@@ -153,14 +154,15 @@ class AuthService:
             try:
                 import redis as redis_mod
                 r = redis_mod.from_url(settings.REDIS_URL, socket_connect_timeout=2, socket_timeout=2)
-                consumed = r.get(f"jti:{jti}")
-                if consumed:
-                    r.close()
-                    raise ValueError("Refresh token has been revoked")
-                r.setex(f"jti:{jti}", settings.REFRESH_TOKEN_EXPIRE_DAYS * 86400, "consumed")
+                consumed = r.set(f"jti:{jti}", "consumed", nx=True, ex=settings.REFRESH_TOKEN_EXPIRE_DAYS * 86400)
                 r.close()
-            except Exception:
-                pass
+                if not consumed:
+                    raise ValueError("Refresh token has been revoked")
+            except ValueError:
+                raise
+            except Exception as exc:
+                # Do not silently claim replay protection when Redis is unavailable.
+                raise ValueError("Token refresh is temporarily unavailable") from exc
 
         access_token = create_access_token({"sub": str(user.id), "email": user.email})
         new_refresh_token = create_refresh_token({"sub": str(user.id), "type": "refresh"})
@@ -180,7 +182,7 @@ class AuthService:
         return True
 
     @staticmethod
-    def get_google_auth_url() -> str:
+    def get_google_auth_url(state: str) -> str:
         from urllib.parse import urlencode
         if not settings.GOOGLE_CLIENT_ID or not settings.GOOGLE_REDIRECT_URI:
             raise ValueError("Google OAuth is not configured")
@@ -191,6 +193,7 @@ class AuthService:
             "scope": "openid email profile",
             "access_type": "offline",
             "prompt": "consent",
+            "state": state,
         }
         return f"https://accounts.google.com/o/oauth2/v2/auth?{urlencode(params)}"
 

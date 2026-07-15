@@ -13,8 +13,6 @@ class QuizResponse(BaseModel):
     pass_percentage: Optional[str] = None
     subject: Optional[dict] = None
 
-    
-
 
 class QuizListResponse(BaseModel):
     quizzes: list[QuizResponse]
@@ -28,8 +26,6 @@ class QuestionResponse(BaseModel):
     order_index: Optional[str] = None
     question_type: str
 
-    
-
 
 class QuizDetailResponse(BaseModel):
     id: str
@@ -39,10 +35,13 @@ class QuizDetailResponse(BaseModel):
     time_limit_minutes: Optional[str] = None
     pass_percentage: Optional[str] = None
     questions: list[QuestionResponse]
+    session_id: str
+    question_count: int
     subject: Optional[dict] = None
 
 
 class SubmitQuizRequest(BaseModel):
+    session_id: str
     answers: dict
     time_taken_seconds: int
 
@@ -65,10 +64,7 @@ class QuizAttemptResponse(BaseModel):
     completed_at: Optional[datetime] = None
     quiz: Optional[QuizResponse] = None
 
-    
-
 
 class QuizAttemptListResponse(BaseModel):
     attempts: list[QuizAttemptResponse]
     total: int
-

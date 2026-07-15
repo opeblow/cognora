@@ -80,51 +80,73 @@ class QuestionPoolService:
         if not topics:
             return []
 
-        try:
-            selected_topic = topics[0] if topics else subject.name
-            result_questions = self._run_async(
-                self.ai_service.generate_exam_questions_for_topic(
-                    subject=subject.name,
-                    exam_type="WAEC/JAMB",
-                    topic=selected_topic,
-                    num_questions=count,
-                )
-            )
-        except Exception as exc:
-            logger.error(f"Failed to generate questions via AI: {exc}")
-            try:
-                result = self.ai_service._generate_questions_from_brave(
-                    subject=subject.name,
-                    topics=topics,
-                    num_questions=count
-                )
-                result_questions = result.get("questions", [])
-            except Exception as exc2:
-                logger.error(f"Failed fallback question generation: {exc2}")
-                return []
-
         questions = []
-        for q_data in result_questions:
-            assigned_topic = q_data.get("topic", "")
-            if assigned_topic not in topics:
-                assigned_topic = topics[0] if topics else subject.name
+        remaining = count
+        max_attempts = 6
 
+        while remaining > 0 and max_attempts > 0:
+            max_attempts -= 1
             try:
-                pool_q = QuestionPool(
-                    subject_id=subject_id,
-                    topic=assigned_topic,
-                    text=q_data["text"],
-                    options=q_data.get("options", []),
-                    correct_answer=q_data["correct_answer"],
-                    explanation=q_data.get("explanation", ""),
-                    difficulty=q_data.get("difficulty", "hard"),
-                    source="ai_generated",
+                selected_topic = topics[len(questions) % len(topics)]
+                result_questions = self._run_async(
+                    self.ai_service.generate_exam_questions_for_topic(
+                        subject=subject.name,
+                        exam_type="WAEC/JAMB",
+                        topic=selected_topic,
+                        num_questions=remaining,
+                    )
                 )
-                self.db.add(pool_q)
-                self.db.flush()
-                questions.append(pool_q)
-            except (KeyError, Exception):
-                continue
+            except Exception as exc:
+                logger.error(f"Failed to generate questions via AI: {exc}")
+                try:
+                    result = self.ai_service._generate_questions_from_brave(
+                        subject=subject.name,
+                        topics=topics,
+                        num_questions=remaining
+                    )
+                    result_questions = result.get("questions", [])
+                except Exception as exc2:
+                    logger.error(f"Failed fallback question generation: {exc2}")
+                    break
+
+            if not result_questions:
+                break
+
+            new_count = 0
+            for q_data in result_questions:
+                if not q_data.get("text") or not q_data.get("options") or not q_data.get("correct_answer"):
+                    continue
+                text = q_data["text"].strip()
+                if len(text) < 15 or "first question" in text.lower():
+                    continue
+                if len(q_data.get("options", [])) < 2:
+                    continue
+
+                assigned_topic = q_data.get("topic", "")
+                if assigned_topic not in topics:
+                    assigned_topic = topics[len(questions) % len(topics)]
+
+                try:
+                    pool_q = QuestionPool(
+                        subject_id=subject_id,
+                        topic=assigned_topic,
+                        text=text,
+                        options=q_data.get("options", []),
+                        correct_answer=q_data["correct_answer"],
+                        explanation=q_data.get("explanation", ""),
+                        difficulty=q_data.get("difficulty", "hard"),
+                        source="ai_generated",
+                    )
+                    self.db.add(pool_q)
+                    self.db.flush()
+                    questions.append(pool_q)
+                    new_count += 1
+                except (KeyError, Exception):
+                    continue
+
+            remaining = count - len(questions)
+            if new_count > 0:
+                self.db.commit()
 
         self.db.commit()
         return questions[:count]

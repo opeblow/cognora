@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 class StorageBackend(ABC):
     @abstractmethod
-    def save(self, file: BinaryIO, filename: str) -> tuple[str, str]:
+    def save(self, file: BinaryIO, filename: str, max_size: int) -> tuple[str, str, int]:
         ...
 
     @abstractmethod
@@ -29,13 +29,22 @@ class LocalStorageBackend(StorageBackend):
         self.base_dir = Path(settings.UPLOAD_DIR)
         self.base_dir.mkdir(parents=True, exist_ok=True)
 
-    def save(self, file: BinaryIO, filename: str) -> tuple[str, str]:
+    def save(self, file: BinaryIO, filename: str, max_size: int) -> tuple[str, str, int]:
         ext = Path(filename).suffix or ""
         stored_name = f"{uuid.uuid4().hex}{ext}"
         dest = self.base_dir / stored_name
-        with open(dest, "wb") as f:
-            shutil.copyfileobj(file, f)
-        return stored_name, str(dest)
+        size = 0
+        try:
+            with open(dest, "wb") as f:
+                while chunk := file.read(1024 * 1024):
+                    size += len(chunk)
+                    if size > max_size:
+                        raise ValueError(f"File too large. Maximum size is {settings.MAX_UPLOAD_SIZE_MB}MB")
+                    f.write(chunk)
+        except Exception:
+            dest.unlink(missing_ok=True)
+            raise
+        return stored_name, str(dest), size
 
     def get_path(self, stored_name: str) -> str:
         return str(self.base_dir / stored_name)
@@ -72,14 +81,14 @@ class FileUploadService:
         from app.models.uploaded_file import UploadedFile
 
         self.validate_file(filename, file_size, mime_type)
-        stored_name, storage_path = self.storage.save(file, filename)
+        stored_name, storage_path, actual_size = self.storage.save(file, filename, self.max_size)
 
         record = UploadedFile(
             user_id=user_id,
             original_filename=filename,
             stored_filename=stored_name,
             mime_type=mime_type,
-            file_size=file_size,
+            file_size=actual_size,
             storage_path=storage_path,
             storage_backend="local",
             ocr_status="pending",

@@ -25,6 +25,13 @@ class PaystackService:
         self.secret_key = settings.PAYSTACK_SECRET_KEY
         self.public_key = settings.PAYSTACK_PUBLIC_KEY
 
+    @staticmethod
+    def get_webhook_secret() -> str:
+        return settings.PAYSTACK_SECRET_KEY
+
+    def get_payment_for_user(self, reference: str, user_id: str) -> Payment | None:
+        return self.db.query(Payment).filter(Payment.reference == reference, Payment.user_id == user_id).first()
+
     def initialize_transaction(self, email: str, amount_kobo: int, metadata: dict | None = None) -> dict | None:
         if not self.secret_key:
             logger.warning("Paystack secret key not configured")
@@ -40,7 +47,7 @@ class PaystackService:
                         "amount": amount_kobo,
                         "reference": reference,
                         "metadata": metadata or {},
-                        "callback_url": f"{settings.CORS_ORIGINS[0]}/credits?reference={reference}",
+                        "callback_url": f"{(settings.CORS_ORIGINS or ['http://localhost:3000'])[0]}/credits?reference={reference}",
                     },
                     headers={
                         "Authorization": f"Bearer {self.secret_key}",
@@ -95,11 +102,11 @@ class PaystackService:
 
         payment = Payment(
             user_id=user_id,
-            amount=str(CREDIT_PACKS[credit_amount]),
+            amount=CREDIT_PACKS[credit_amount],
             currency="NGN",
             status="pending",
             reference=result["reference"],
-            credits_purchased=str(credit_amount),
+            credits_purchased=credit_amount,
         )
         self.db.add(payment)
         self.db.commit()
@@ -118,13 +125,22 @@ class PaystackService:
 
         if event == "charge.success":
             reference = data.get("reference", "")
-            payment = self.db.query(Payment).filter(Payment.reference == reference).first()
+            payment = self.db.query(Payment).filter(Payment.reference == reference).with_for_update().first()
             if not payment:
                 logger.warning(f"Payment not found for reference: {reference}")
                 return False
 
             if payment.status == "completed":
                 return True
+
+            verified = self.verify_transaction(reference)
+            if not verified or verified.get("amount") != payment.amount * 100 or verified.get("currency") != payment.currency:
+                logger.warning("Rejected payment webhook with mismatched provider data for %s", reference)
+                return False
+            metadata = verified.get("metadata") or {}
+            if str(metadata.get("user_id")) != str(payment.user_id) or int(metadata.get("credit_amount", 0)) != payment.credits_purchased:
+                logger.warning("Rejected payment webhook with mismatched metadata for %s", reference)
+                return False
 
             payment.status = "completed"
             payment.payment_method = data.get("channel", "unknown")

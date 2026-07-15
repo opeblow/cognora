@@ -5,6 +5,7 @@ from app.dependencies.auth import get_current_user
 from app.models.user import User
 from app.services.file_storage_service import FileUploadService
 from app.schemas.file import UploadFileResponse, FileListResponse, OcrStatusResponse
+from app.core.config import settings
 
 router = APIRouter(prefix="/files", tags=["Files"])
 
@@ -18,6 +19,9 @@ def upload_file(
     if not file.filename:
         raise HTTPException(status_code=400, detail="No file provided")
 
+    # Content-Type is only a hint, but reject disallowed values before writing.
+    if (file.content_type or "") not in settings.ALLOWED_UPLOAD_TYPES:
+        raise HTTPException(status_code=400, detail="File type is not allowed")
     service = FileUploadService(db)
     try:
         record = service.store_file(

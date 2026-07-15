@@ -23,12 +23,14 @@ from app.models.gamification import Badge, UserBadge
 from app.models.lobby import StudyLobby, LobbyMessage
 from app.models.flashcard import Flashcard, FlashcardReview
 from app.models.syllabus import Syllabus
+from app.models.quiz_session import QuizSession
 
 __all__ = [
     "User", "EmailVerification", "PasswordReset",
     "Subject", "Chapter",
     "Lesson", "Topic", "TextbookSection",
     "Quiz", "Question", "QuizAttempt", "QuizAnswer",
+    "QuizSession",
     "Exam", "ExamQuestion", "ExamResult", "ExamAnswer",
     "StudyPlan", "StudyPlanDay",
     "CreditTransaction",

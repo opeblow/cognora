@@ -1,6 +1,7 @@
 import json
 import logging
 import uuid
+import asyncio
 from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, WebSocket, WebSocketDisconnect
 from sqlalchemy.orm import Session
@@ -29,20 +30,24 @@ def upload_audio(
     upload_dir = Path(settings.UPLOAD_DIR) / "audio"
     upload_dir.mkdir(parents=True, exist_ok=True)
 
+    if (file.content_type or "") not in settings.ALLOWED_UPLOAD_TYPES or not (file.content_type or "").startswith("audio/"):
+        raise HTTPException(status_code=400, detail="Unsupported audio type")
     ext = Path(file.filename).suffix or ".webm"
     stored_name = f"{uuid.uuid4().hex}{ext}"
     dest = upload_dir / stored_name
 
-    content = file.file.read()
-    if len(content) > settings.MAX_UPLOAD_SIZE_MB * 1024 * 1024:
-        raise HTTPException(
-            status_code=400,
-            detail=f"File too large. Maximum size is {settings.MAX_UPLOAD_SIZE_MB}MB",
-        )
     try:
         with open(dest, "wb") as f:
-            f.write(content)
+            size = 0
+            while chunk := file.file.read(1024 * 1024):
+                size += len(chunk)
+                if size > settings.MAX_UPLOAD_SIZE_MB * 1024 * 1024:
+                    raise HTTPException(status_code=400, detail=f"File too large. Maximum size is {settings.MAX_UPLOAD_SIZE_MB}MB")
+                f.write(chunk)
     except Exception as e:
+        dest.unlink(missing_ok=True)
+        if isinstance(e, HTTPException):
+            raise
         logger.error(f"Failed to save audio file: {e}")
         raise HTTPException(status_code=500, detail="Failed to save audio file")
 
@@ -109,33 +114,44 @@ async def audio_websocket(websocket: WebSocket):
         await websocket.close()
         return
 
-    user_id = payload.get("sub")
+    if payload.get("type") != "access" or not payload.get("sub"):
+        await websocket.close(code=1008)
+        return
+    user_id = payload["sub"]
     subject = meta.get("subject")
     topic = meta.get("topic")
 
-    audio_chunks = []
-
-    try:
-        while True:
-            chunk = await websocket.receive_bytes()
-            audio_chunks.append(chunk)
-    except WebSocketDisconnect:
-        logger.info(f"WebSocket disconnected after receiving {len(audio_chunks)} chunks")
-    except Exception as e:
-        logger.error(f"WebSocket error: {e}")
-
-    if not audio_chunks:
-        await websocket.send_json({"error": "No audio data received"})
-        return
-
+    max_bytes = settings.MAX_UPLOAD_SIZE_MB * 1024 * 1024
+    received = 0
     upload_dir = Path(settings.UPLOAD_DIR) / "audio"
     upload_dir.mkdir(parents=True, exist_ok=True)
-    stored_name = f"ws_{uuid.uuid4().hex}.webm"
-    dest = upload_dir / stored_name
+    dest = upload_dir / f"ws_{uuid.uuid4().hex}.webm"
 
-    with open(dest, "wb") as f:
-        for chunk in audio_chunks:
-            f.write(chunk)
+    disconnected = False
+    try:
+        with open(dest, "wb") as f:
+            while True:
+                chunk = await asyncio.wait_for(websocket.receive_bytes(), timeout=30)
+                received += len(chunk)
+                if received > max_bytes:
+                    try:
+                        await websocket.send_json({"error": "Audio exceeds size limit"})
+                    except Exception:
+                        pass
+                    await websocket.close(code=1009)
+                    dest.unlink(missing_ok=True)
+                    return
+                f.write(chunk)
+    except WebSocketDisconnect:
+        logger.info("WebSocket disconnected after receiving %s bytes", received)
+        disconnected = True
+    except Exception as e:
+        logger.error(f"WebSocket error: {e}")
+        disconnected = True
+
+    if not received:
+        logger.warning("No audio data received via WebSocket")
+        return
 
     db = SessionLocal()
     try:
@@ -154,10 +170,10 @@ async def audio_websocket(websocket: WebSocket):
         service = AudioService()
 
         try:
-            transcript = service.transcribe(str(dest))
+            transcript = await asyncio.to_thread(service.transcribe, str(dest))
             record.transcript = transcript
 
-            feedback = service.generate_feedback(transcript, subject, topic)
+            feedback = await asyncio.to_thread(service.generate_feedback, transcript, subject, topic)
             record.ai_feedback = feedback
             record.processing_status = "completed"
         except Exception as e:

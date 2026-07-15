@@ -10,7 +10,7 @@ export const quizService = {
 
   getById: (id: string) => api.get<QuizDetail>(`/quizzes/${id}`),
 
-  submit: (quizId: string, data: { answers: Record<string, string>; time_taken_seconds: number }) =>
+  submit: (quizId: string, data: { session_id: string; answers: Record<string, string>; time_taken_seconds: number }) =>
     api.post<SubmitQuizResponse>(`/quizzes/${quizId}/submit`, data),
 
   getMyAttempts: () => api.get<{ attempts: QuizAttempt[]; total: number }>("/quizzes/attempts/mine"),

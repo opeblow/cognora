@@ -28,9 +28,12 @@ export default function QuizDetailPage() {
   const [result, setResult] = useState<SubmitQuizResponse | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [elapsed, setElapsed] = useState(0)
+  const mountedRef = useRef(true)
+  const submittedRef = useRef(false)
 
   useEffect(() => {
     if (!isAuthenticated) router.push("/login")
+    return () => { mountedRef.current = false }
   }, [isAuthenticated, router])
 
   const { data: quiz, isLoading } = useQuery({
@@ -39,7 +42,9 @@ export default function QuizDetailPage() {
     enabled: isAuthenticated,
   })
 
-  const timeLimit = quiz?.time_limit_minutes ? parseInt(quiz.time_limit_minutes) * 60 : null
+  const sessionId = quiz?.session_id ?? null
+
+  const timeLimit = quiz?.time_limit_minutes ? Math.min(quiz.time_limit_minutes, 6) * 60 : null
   const timeLeft = timeLimit !== null ? Math.max(0, timeLimit - elapsed) : null
 
   const handleAnswer = (questionId: string, answer: string) => {
@@ -49,22 +54,25 @@ export default function QuizDetailPage() {
   const handleSubmitRef = useRef<(() => Promise<void>) | null>(null)
 
   const handleSubmit = async () => {
-    if (submitting) return
+    if (submitting || !sessionId || submittedRef.current) return
+    submittedRef.current = true
     setSubmitting(true)
     try {
       const res = await quizService.submit(quizId, {
+        session_id: sessionId,
         answers,
         time_taken_seconds: Math.floor((Date.now() - startTime) / 1000),
       })
-      setResult(res)
+      if (mountedRef.current) setResult(res)
     } catch (error: unknown) {
+      submittedRef.current = false
       const err = error as { message?: string }
       toast.error(err.message || "Failed to submit quiz")
       if (err.message?.includes("Insufficient credits")) {
         router.push("/credits")
       }
     } finally {
-      setSubmitting(false)
+      if (mountedRef.current) setSubmitting(false)
     }
   }
 
@@ -72,31 +80,43 @@ export default function QuizDetailPage() {
 
   useEffect(() => {
     if (timeLimit === null || result) return
-
     const timer = setInterval(() => {
-      setElapsed((prev) => {
-        const next = prev + 1
-        if (next >= timeLimit) {
-          clearInterval(timer)
-          handleSubmitRef.current?.()
-        }
-        return next
-      })
+      setElapsed((prev) => prev + 1)
     }, 1000)
-
     return () => clearInterval(timer)
   }, [timeLimit, result])
 
+  useEffect(() => {
+    if (timeLimit !== null && elapsed >= timeLimit && !submittedRef.current) {
+      handleSubmitRef.current?.()
+    }
+  }, [elapsed, timeLimit])
+
   if (!isAuthenticated) return null
+
+  const questions = quiz?.questions || []
+  const question = questions[currentQuestion]
+
   if (isLoading) {
     return (
       <div className="flex min-h-screen bg-[#F8FAFC]">
         <Sidebar />
         <main className="ml-64 flex-1 p-8">
-          <div className="animate-pulse space-y-4">
-            <div className="h-8 w-64 rounded bg-gray-100" />
-            <div className="h-4 w-96 rounded bg-gray-100" />
-            <div className="h-64 rounded-xl bg-gray-100" />
+          <div className="mx-auto max-w-3xl">
+            <div className="mb-6">
+              <div className="h-8 w-64 animate-pulse rounded bg-gray-200" />
+              <div className="mt-2 h-4 w-48 animate-pulse rounded bg-gray-200" />
+            </div>
+            <div className="animate-pulse space-y-4">
+              <div className="flex items-center justify-center rounded-xl bg-gray-100 p-12">
+                <div className="text-center">
+                  <div className="mx-auto h-8 w-8 animate-spin rounded-full border-4 border-gray-300 border-t-[#2563EB]" />
+                  <p className="mt-4 text-sm text-gray-500">
+                    Loading quiz...
+                  </p>
+                </div>
+              </div>
+            </div>
           </div>
         </main>
       </div>
@@ -177,9 +197,6 @@ export default function QuizDetailPage() {
       </div>
     )
   }
-
-  const questions = quiz?.questions || []
-  const question = questions[currentQuestion]
 
   return (
     <div className="flex min-h-screen bg-[#F8FAFC]">

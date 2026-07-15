@@ -10,14 +10,37 @@ from openai import AsyncOpenAI, OpenAI
 
 logger = logging.getLogger(__name__)
 
+_openai_client: Optional[OpenAI] = None
+_async_openai_client: Optional[AsyncOpenAI] = None
+
+
+def _get_openai_client() -> OpenAI:
+    global _openai_client
+    if _openai_client is None:
+        _openai_client = OpenAI(api_key=settings.OPENAI_API_KEY, timeout=120.0)
+    return _openai_client
+
+
+def _get_async_openai_client() -> AsyncOpenAI:
+    global _async_openai_client
+    if _async_openai_client is None:
+        _async_openai_client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY, timeout=120.0)
+    return _async_openai_client
+
 
 class AIService:
     def __init__(self):
         self.api_key = settings.OPENAI_API_KEY
         self.model = settings.OPENAI_MODEL
-        self.client = OpenAI(api_key=self.api_key, timeout=120.0)
-        self.async_client = AsyncOpenAI(api_key=self.api_key, timeout=120.0)
         self.brave_api_key = settings.BRAVE_API_KEY
+
+    @property
+    def client(self) -> OpenAI:
+        return _get_openai_client()
+
+    @property
+    def async_client(self) -> AsyncOpenAI:
+        return _get_async_openai_client()
 
     def _call_openai(self, messages: list[dict], temperature: float = 0.7, max_tokens: int = 4000) -> str:
         try:
@@ -27,7 +50,7 @@ class AIService:
                 temperature=temperature,
                 max_tokens=max_tokens
             )
-            return response.choices[0].message.content
+            return response.choices[0].message.content or ""
         except openai.AuthenticationError as e:
             logger.error(f"OpenAI authentication error: {e}")
             raise ValueError("AI service authentication failed. Please check the API key.")
@@ -340,7 +363,7 @@ Write PART 3 now — maximum detail (~7,000 tokens)."""
                     temperature=0.7,
                     max_tokens=7000
                 )
-                content = response.choices[0].message.content
+                content = response.choices[0].message.content or ""
                 if content.startswith("```"):
                     lines = content.split("\n")
                     content = "\n".join(lines[1:-1])
@@ -361,7 +384,7 @@ Write PART 3 now — maximum detail (~7,000 tokens)."""
                 temperature=temperature,
                 max_tokens=max_tokens
             )
-            return response.choices[0].message.content
+            return response.choices[0].message.content or ""
         except openai.AuthenticationError as e:
             logger.error(f"OpenAI authentication error: {e}")
             raise ValueError("AI service authentication failed. Please check the API key.")
@@ -434,69 +457,58 @@ Write detailed HTML content with worked examples, step-by-step solutions, and ex
         exam_type: str,
         topic: str,
         num_questions: int = 10,
+        skip_search: bool = False,
     ) -> list[dict]:
-        """Generate exam questions using Brave Search + AI with cognitive depth emphasis."""
-
-        queries = [
-            f"{exam_type} {subject} {topic} past questions answers",
-            f"{exam_type} {subject} difficult questions {topic}",
-            f"{subject} {topic} examination questions and answers",
-        ]
-        all_results = []
-        for q in queries:
-            if len(all_results) >= 30:
-                break
-            results = await self._brave_search_async(q, count=8)
-            all_results.extend(results)
-
-        search_text = ""
-        if all_results:
-            search_text = "\n\n---\n\n".join([
-                f"Source {i+1}: {r['title']}\nURL: {r.get('url', '')}\nContent: {r['snippet']}"
-                for i, r in enumerate(all_results)
-            ])
-            if len(search_text) > 25000:
-                search_text = search_text[:25000] + "..."
+        """Generate exam questions using AI with optional Brave Search enrichment."""
 
         extract_section = ""
-        if search_text:
-            extract_section = f"""
+        if not skip_search:
+            queries = [
+                f"{exam_type} {subject} {topic} past questions answers",
+                f"{exam_type} {subject} difficult questions {topic}",
+                f"{subject} {topic} examination questions and answers",
+            ]
+            all_results = []
+            for q in queries:
+                if len(all_results) >= 30:
+                    break
+                results = await self._brave_search_async(q, count=8)
+                all_results.extend(results)
+
+            search_text = ""
+            if all_results:
+                search_text = "\n\n---\n\n".join([
+                    f"Source {i+1}: {r['title']}\nURL: {r.get('url', '')}\nContent: {r['snippet']}"
+                    for i, r in enumerate(all_results)
+                ])
+                if len(search_text) > 25000:
+                    search_text = search_text[:25000] + "..."
+
+            if search_text:
+                extract_section = f"""
 Below are web search results with real exam questions. Extract any real questions found:
 {search_text}
 
 ---
 """
 
-        prompt = f"""You are a senior {exam_type} examiner for {subject}. Generate {num_questions} multiple-choice questions about "{topic}" for the {exam_type} examination.
+        prompt = f"""Generate {num_questions} multiple-choice questions about "{topic}" in {subject} for {exam_type} examination.
 
-CRITICAL REQUIREMENTS:
-1. COGNITIVE DEPTH: Each question MUST test conceptual understanding, analytical thinking, or multi-step reasoning. NOT simple recall.
-2. NON-STRAIGHTFORWARD: Avoid direct definition questions. Use scenario-based, application-based, and problem-solving questions.
-3. DISTRACTORS: Each wrong option must be a plausible error a capable student might make (based on common misconceptions).
-4. EXAM STANDARD: Match the style, difficulty, and format of actual {exam_type} questions.
-5. EXPLANATIONS: Each answer must explain WHY it is correct and WHY each distractor is wrong — this reinforces learning.
-
-{extract_section}
+Each question must:
+- Test real understanding, not recall
+- Have 4 plausible options where wrong ones are common mistakes
+- Include a step-by-step explanation
+- Use plain text for formulas (x^2, sqrt(x), a/b)
 
 Return ONLY valid JSON:
-{{"questions": [
-  {{
-    "text": "question text with plain text math (NO LaTeX)",
-    "options": ["A) option", "B) option", "C) option", "D) option"],
-    "correct_answer": "A",
-    "explanation": "Detailed explanation of why correct and why others are wrong",
-    "difficulty": "hard",
-    "topic": "{topic}",
-    "cognitive_level": "application" | "analysis" | "synthesis"
-  }}
-]}}"""
+{{"questions": [{{"text":"...","options":["A) ...","B) ...","C) ...","D) ..."],"correct_answer":"A","explanation":"...","difficulty":"medium","topic":"{topic}"}}]}}"""
 
         messages = [
-            {"role": "system", "content": f"You are a {exam_type} examiner. Generate high-quality, cognitively demanding questions. Use plain text for all math."},
+            {"role": "system", "content": "You are a WAEC/JAMB examiner. Generate questions that test understanding. Return ONLY valid JSON."},
             {"role": "user", "content": prompt}
         ]
 
-        response = await self._call_openai_async(messages, temperature=0.8, max_tokens=4000)
+        response = await self._call_openai_async(messages, temperature=0.7, max_tokens=3000)
         response = response.strip()
         if response.startswith("```"):
             lines = response.split("\n")
@@ -506,7 +518,50 @@ Return ONLY valid JSON:
             data = json.loads(response)
             return data.get("questions", [])[:num_questions]
         except json.JSONDecodeError:
-            logger.error(f"Failed to parse generated exam questions JSON")
+            logger.error(f"Failed to parse generated exam questions JSON, raw: {response[:200]}")
+            return []
+
+    def generate_exam_questions_sync(
+        self,
+        subject: str,
+        exam_type: str,
+        topic: str,
+        num_questions: int = 10,
+    ) -> list[dict]:
+        """Synchronous, no-Brave-search question generation for parallel use."""
+        prompt = f"""You are a JAMB chief examiner for {subject}. Generate {num_questions} extremely difficult multiple-choice questions.
+
+COVERAGE: Pull questions from across the ENTIRE {subject} syllabus — mix topics, don't focus on one area. Connect 2-3 different concepts in each question.
+
+DIFFICULTY RULES:
+- Require 3+ step reasoning — never test a single fact
+- Each question must have a "trap" answer that looks obviously correct but is wrong
+- Include distractors that match specific common student mistakes
+- Frame as multi-layered scenarios, calculations, or experiments
+- Use "always/never/only/except/all of the above except" for precision traps
+- Calculations must need unit conversions or hidden conditions
+
+MATH FORMAT: Use plain text (x^2, sqrt(x), x/y) — NO LaTeX.
+
+Return ONLY JSON:
+{{"questions":[
+  {{"text":"...","options":["A) ...","B) ...","C) ...","D) ..."],"correct_answer":"A","explanation":"Why right + why each distractor is wrong","difficulty":"very_hard","topic":"mixed"}}
+]}}"""
+
+        messages = [
+            {"role": "system", "content": f"You are the toughest JAMB chief examiner. Your questions make top students cry. Every question must have a deadly trap. Connect multiple syllabus topics per question. Plain text math only."},
+            {"role": "user", "content": prompt}
+        ]
+
+        try:
+            response = self._call_openai(messages, temperature=0.7, max_tokens=2500)
+            response = response.strip()
+            if response.startswith("```"):
+                lines = response.split("\n")
+                response = "\n".join(lines[1:-1])
+            data = json.loads(response)
+            return data.get("questions", [])[:num_questions]
+        except Exception:
             return []
 
     def generate_study_plan(self, subjects: list[str], duration_days: int) -> list[dict]:

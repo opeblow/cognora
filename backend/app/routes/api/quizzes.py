@@ -23,14 +23,14 @@ def get_quizzes(
 
 
 @router.get("/{quiz_id}", response_model=dict)
-def get_quiz(
+async def get_quiz(
     quiz_id: str,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     service = QuizService(db)
     try:
-        return service.get_quiz_detail(quiz_id, str(current_user.id))
+        return await service.get_quiz_detail(quiz_id, str(current_user.id))
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
@@ -44,7 +44,7 @@ def submit_quiz(
 ):
     service = QuizService(db)
     try:
-        return service.submit_quiz(quiz_id, str(current_user.id), request.answers, request.time_taken_seconds)
+        return service.submit_quiz(request.session_id, str(current_user.id), request.answers, request.time_taken_seconds)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 

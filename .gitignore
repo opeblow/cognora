@@ -1,18 +1,62 @@
+# Dependencies
 node_modules/
-.next/
-__pycache__/
-*.pyc
-.env
-.env.local
 venv/
 *.egg-info/
+
+# Build outputs
+.next/
 dist/
 build/
+out/
+
+# Environment files
+.env
+.env.local
+.env.development
+.env.production
+.env.staging
+.env.example
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
 .pytest_cache/
+.coverage
+htmlcov/
+
+# Database
 *.db
 *.sqlite3
-*.log
-.DS_Store
+
+# Uploads & generated data
 backend/uploads/
+backend/app/utils/seed_data.py
+
+# Logs
+*.log
+npm-debug.log*
+celerybeat-schedule
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Docker
+docker-compose.override.yml
+
+# Sentry
+.sentryclirc
+
+# Next.js
+frontend/.next/
+
+# uvicorn
 backend/uvicorn_err.txt
 backend/uvicorn_out.txt

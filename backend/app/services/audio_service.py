@@ -19,6 +19,7 @@ class AudioService:
                 file=audio_file,
                 response_format="text",
             )
+        transcript = transcript or ""
         logger.info(f"Transcribed audio ({len(transcript)} chars)")
         return transcript.strip()
 

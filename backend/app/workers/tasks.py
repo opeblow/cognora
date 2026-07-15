@@ -12,20 +12,25 @@ logger = logging.getLogger(__name__)
 
 @celery_app.task
 def reset_weekly_credits():
+    from sqlalchemy import update
+    from app.models.user import User
+
     db = SessionLocal()
     try:
-        repo = UserRepository(db)
-        users, _ = repo.get_all()
         now = datetime.now(timezone.utc)
-        for user in users:
-            reset_at = user.weekly_credits_reset_at
-            if reset_at:
-                if reset_at.tzinfo is None:
-                    reset_at = reset_at.replace(tzinfo=timezone.utc)
-                if reset_at <= now:
-                    user.weekly_credits_used = 0
-                    user.weekly_credits_reset_at = now + timedelta(days=7)
+        stmt = (
+            update(User)
+            .where(User.weekly_credits_reset_at <= now)
+            .values(
+                weekly_credits_used=0,
+                weekly_credits_reset_at=now + timedelta(days=7)
+            )
+        )
+        db.execute(stmt)
         db.commit()
+    except Exception as e:
+        logger.error(f"Failed to reset weekly credits: {e}")
+        db.rollback()
     finally:
         db.close()
 
@@ -125,7 +130,19 @@ def transcribe_audio(self, audio_id: str):
         db.close()
 
 
-@celery_app.task(bind=True, max_retries=2, default_retry_delay=30, autoretry_for=(Exception,))
+def _run_async(coro):
+    import asyncio
+    try:
+        return asyncio.run(coro)
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        try:
+            return loop.run_until_complete(coro)
+        finally:
+            loop.close()
+
+
+@celery_app.task(bind=True, max_retries=2, default_retry_delay=30)
 def pre_generate_textbook_sections(self):
     from sqlalchemy import select
     from app.models.lesson import Topic, Lesson
@@ -152,23 +169,23 @@ def pre_generate_textbook_sections(self):
                 continue
 
             for section in sections:
-                cached = service.get_cached_section(str(topic.id), section["index"])
+                cached = _run_async(service.get_cached_section(str(topic.id), section["index"]))
                 if cached:
                     continue
 
                 previous_sections = []
                 for i in range(section["index"]):
-                    prev = service.get_cached_section(str(topic.id), i)
+                    prev = _run_async(service.get_cached_section(str(topic.id), i))
                     previous_sections.append(prev or "")
 
                 try:
-                    content = generate_section_content(
+                    content = _run_async(generate_section_content(
                         subject=subject.name,
                         topic=topic.title,
                         section_index=section["index"],
                         previous_sections=previous_sections,
-                    )
-                    service.cache_section(str(topic.id), section["index"], content)
+                    ))
+                    _run_async(service.cache_section(str(topic.id), section["index"], content))
                     generated_count += 1
                     logger.info(
                         f"Pre-generated: {subject.name} / {topic.title} / section {section['index']} ({generated_count} total)"
@@ -177,12 +194,13 @@ def pre_generate_textbook_sections(self):
                     logger.error(
                         f"Failed pre-generating {subject.name} / {topic.title} / section {section['index']}: {e}"
                     )
-                    raise
+                    # Skip to the next section or topic instead of raising and retrying the whole task
+                    continue
 
         logger.info(f"Pre-generation complete. Generated {generated_count} new sections.")
     except Exception as exc:
         logger.error(f"Pre-generation task failed: {exc}")
-        raise
+        raise self.retry(exc=exc)
     finally:
         db.close()
 
@@ -250,5 +268,60 @@ Respond in JSON format:
     except Exception as exc:
         logger.error(f"Failed to review issue {issue_id}: {exc}")
         raise self.retry(exc=exc)
+    finally:
+        db.close()
+
+
+@celery_app.task(bind=True, max_retries=2, default_retry_delay=30, autoretry_for=(Exception,))
+def pre_generate_question_pool(self):
+    from sqlalchemy import select, func
+    from app.models.subject import Subject
+    from app.models.question_pool import QuestionPool
+    from app.models.lesson import Topic
+    from app.services.question_pool_service import QuestionPoolService
+
+    db = SessionLocal()
+    try:
+        subjects = db.execute(select(Subject)).scalars().all()
+        if not subjects:
+            logger.info("No subjects found for question pool pre-generation")
+            return
+
+        pool_service = QuestionPoolService(db)
+        generated_total = 0
+
+        for subject in subjects:
+            count_query = select(func.count()).select_from(QuestionPool).where(
+                QuestionPool.subject_id == subject.id,
+                QuestionPool.is_active == True
+            )
+            current_count = db.execute(count_query).scalar() or 0
+
+            target_count = 50
+            if current_count < target_count:
+                needed = min(20, target_count - current_count)
+                logger.info(f"Subject {subject.name} has {current_count} questions. Pre-generating {needed} more...")
+                
+                topic_objs = (
+                    db.query(Topic)
+                    .join(Topic.lesson)
+                    .filter(Topic.lesson.has(subject_id=subject.id))
+                    .all()
+                )
+                topics = [t.title for t in topic_objs]
+                if not topics:
+                    topics = ["general"]
+
+                try:
+                    new_qs = pool_service._generate_questions(str(subject.id), topics, needed)
+                    generated_total += len(new_qs)
+                    logger.info(f"Generated {len(new_qs)} new questions for {subject.name}")
+                except Exception as e:
+                    logger.error(f"Failed pre-generating questions for {subject.name}: {e}")
+
+        logger.info(f"Question pool pre-generation complete. Generated {generated_total} new questions.")
+    except Exception as exc:
+        logger.error(f"Question pool pre-generation task failed: {exc}")
+        raise
     finally:
         db.close()
