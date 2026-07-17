@@ -60,3 +60,13 @@ frontend/.next/
 # uvicorn
 backend/uvicorn_err.txt
 backend/uvicorn_out.txt
+
+# Test files
+test_*.py
+test_*.ps1
+test_*.json
+token.txt
+login.json
+list_routes.py
+check_tables.py
+*.json.bak
