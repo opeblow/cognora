@@ -138,6 +138,13 @@ def get_topic_detail(
 
     has_expanded = topic.content and len(topic.content) > 2000
 
+    all_topics = db.execute(
+        select(Topic)
+        .join(Lesson, Topic.lesson_id == Lesson.id)
+        .where(Lesson.subject_id == subject.id)
+        .order_by(Lesson.order_index, Topic.order_index)
+    ).scalars().all()
+
     return {
         "id": str(topic.id),
         "title": topic.title,
@@ -160,7 +167,7 @@ def get_topic_detail(
                 "title": t.title,
                 "order_index": t.order_index,
             }
-            for t in lesson.topics
+            for t in all_topics
         ],
     }
 

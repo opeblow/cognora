@@ -70,13 +70,13 @@ def generate_flashcards(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-    result, _ = service.get_flashcards(
+    result, total = service.get_flashcards(
         user_id=str(current_user.id),
         topic_id=request.topic_id,
     )
     return FlashcardListResponse(
         flashcards=[_card_to_response(c) for c in result],
-        total=len(result),
+        total=total,
     )
 
 
@@ -111,3 +111,13 @@ def delete_flashcard(
     if not deleted:
         raise HTTPException(status_code=404, detail="Flashcard not found")
     return {"message": "Flashcard deleted"}
+
+
+@router.delete("", response_model=dict)
+def delete_all_flashcards(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    service = FlashcardService(db)
+    count = service.delete_all_flashcards(str(current_user.id))
+    return {"message": f"Deleted {count} flashcards", "deleted": count}

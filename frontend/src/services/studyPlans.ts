@@ -40,8 +40,13 @@ export const studyPlanService = {
     start_date: string
     end_date?: string
     subjects: string[]
+    hours_per_day?: number
+    subject_topics?: Record<string, string[]>
     use_ai?: boolean
   }) => api.post<StudyPlan>("/study-planner", data),
+
+  deletePlan: (planId: string) =>
+    api.delete<{ message: string }>(`/study-planner/${planId}`),
 
   markDayCompleted: (dayId: string) =>
     api.post<{ day: StudyPlanDay }>(`/study-planner/days/${dayId}/complete`),

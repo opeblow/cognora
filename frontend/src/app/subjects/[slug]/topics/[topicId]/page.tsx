@@ -430,7 +430,7 @@ export default function TopicDetailPage() {
                   value={issueDescription}
                   onChange={(e) => setIssueDescription(e.target.value)}
                   placeholder="Describe what's wrong with this content..."
-                  className="h-24 w-full rounded-lg border border-gray-200 p-2 text-sm focus:border-[#2563EB] focus:outline-none"
+                  className="h-24 w-full rounded-lg border border-gray-200 bg-white p-2 text-sm text-[#0F172A] placeholder:text-gray-400 focus:border-[#2563EB] focus:outline-none"
                 />
               </div>
               <div className="flex justify-end gap-2">

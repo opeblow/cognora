@@ -25,8 +25,6 @@ class FlashcardService:
         if not self.openai:
             raise ValueError("OpenAI API key not configured")
 
-        existing_tags = topic.title or ""
-
         response = self.openai.chat.completions.create(
             model=settings.OPENAI_MODEL,
             messages=[
@@ -242,3 +240,14 @@ class FlashcardService:
         card.is_active = False
         self.db.commit()
         return True
+
+    def delete_all_flashcards(self, user_id: str) -> int:
+        cards = self.db.query(Flashcard).filter(
+            Flashcard.user_id == user_id,
+            Flashcard.is_active == True,
+        ).all()
+        count = len(cards)
+        for card in cards:
+            card.is_active = False
+        self.db.commit()
+        return count

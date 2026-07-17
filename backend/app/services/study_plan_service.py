@@ -1,4 +1,3 @@
-import random
 from datetime import date, datetime, timezone, timedelta
 from typing import Optional
 from sqlalchemy.orm import Session
@@ -10,6 +9,19 @@ from app.repositories.lesson import LessonRepository
 from app.models.study_plan import StudyPlan, StudyPlanDay
 from app.models.quiz import QuizAttempt, QuizAnswer
 from app.services.ai_service import AIService
+
+FOCUS_TIPS = [
+    "Put your phone on silent and keep it face-down. Distractions kill focus.",
+    "Study in short bursts. 45 min focus beats 2 hours of distraction.",
+    "No social media during this session. You can check it after.",
+    "Close every tab you don't need. Your future self will thank you.",
+    "Drink water before you start. Dehydration kills concentration.",
+    "Tell someone you're studying so they don't interrupt you.",
+    "Start with the hardest topic while your brain is fresh.",
+    "Write key points by hand. It helps you remember better.",
+    "If your mind wanders, write the thought down and come back to it.",
+    "Reward yourself after this session — but not with social media.",
+]
 
 
 class StudyPlanService:
@@ -78,95 +90,161 @@ class StudyPlanService:
             ],
         }
 
+    def delete_plan(self, plan_id: str, user_id: str) -> bool:
+        plan = self.repo.get_with_days(plan_id)
+        if not plan or str(plan.user_id) != user_id:
+            return False
+        self.db.delete(plan)
+        self.db.commit()
+        return True
+
     def _scheduling_algorithm(
         self,
         subjects: list[str],
         start_date: date,
         end_date: date,
-        topics_per_subject: dict[str, list[str]] = None,
+        hours_per_day: float,
+        subject_topics: dict[str, list[str]] = None,
     ) -> list[dict]:
-        """Break subjects into daily micro-tasks using a round-robin + spaced repetition approach.
+        """Create a realistic daily study timetable with breaks.
 
         Algorithm:
-        1. Calculate total available days.
-        2. Partition subjects evenly across days.
-        3. Within each subject, distribute topics with increasing difficulty.
-        4. Insert review sessions at spaced intervals (1, 3, 7 days after first study).
+        1. Build a master topic queue: each topic is a "study block" (~45 min).
+        2. Each day: fill available hours with study blocks + 10-min breaks.
+        3. Spread subjects across the week (no two hard subjects back-to-back).
+        4. Add a focus tip to every day.
+        5. If topics run out before the plan ends, cycle back for revision.
         """
         total_days = (end_date - start_date).days + 1
         if total_days <= 0:
             total_days = 1
 
-        MAX_TASKS = 500
-        tasks = []
-        day_offset = 0
+        total_available_minutes = int(hours_per_day * 60)
+        block_minutes = 45
+        break_minutes = 10
+        revision_weight = 3
 
-        subject_cycle = subjects.copy()
-        random.Random(str(start_date)).shuffle(subject_cycle)
+        topic_queue = []
+        for subj in subjects:
+            topics = (subject_topics or {}).get(subj, [])
+            if not topics:
+                topics = [f"{subj} — Core Concepts"]
+            for t in topics:
+                topic_queue.append({"subject": subj, "topic": t, "is_revision": False})
 
-        days_per_subject = min(max(1, total_days // len(subjects)), 30)
-        review_intervals = [1, 3, 7]
+        if not topic_queue:
+            topic_queue = [{"subject": subjects[0], "topic": f"{subjects[0]} — Core Concepts", "is_revision": False}]
 
-        for subj_idx, subject_name in enumerate(subject_cycle):
-            subj_topics = topics_per_subject.get(subject_name, []) if topics_per_subject else []
-            if not subj_topics:
-                subj_topics = [f"{subject_name} - Core Concepts"]
+        all_tasks = []
+        topic_idx = 0
+        tip_idx = 0
+        day_count = 0
 
-            tasks_per_day = max(1, len(subj_topics) // days_per_subject)
-            topic_idx = 0
+        while day_count < total_days:
+            current_date = start_date + timedelta(days=day_count)
+            day_minutes_used = 0
+            day_blocks = []
+            day_subjects_used = set()
 
-            for day_in_subject in range(days_per_subject):
-                current_date = start_date + timedelta(days=day_offset)
-                if current_date > end_date:
-                    break
-
-                daily_topics = subj_topics[topic_idx : topic_idx + tasks_per_day]
-                if not daily_topics:
-                    daily_topics = [f"{subject_name} - Revision"]
-                topic_idx += tasks_per_day
-                if topic_idx >= len(subj_topics):
+            while day_minutes_used + block_minutes <= total_available_minutes:
+                if topic_idx >= len(topic_queue):
                     topic_idx = 0
 
-                session_minutes = min(120, 30 + day_in_subject * 5)
+                item = topic_queue[topic_idx]
+                topic_idx += 1
 
-                tasks.append({
-                    "date": current_date,
-                    "subjects": [subject_name],
-                    "topics": daily_topics,
-                    "duration_minutes": str(session_minutes),
-                })
+                label = f"Revision: {item['topic']}" if item["is_revision"] else item["topic"]
+                remaining = total_available_minutes - day_minutes_used - break_minutes
+                actual_block = min(block_minutes, remaining)
 
-                if len(tasks) >= MAX_TASKS:
+                if actual_block < 15:
                     break
 
-                for interval in review_intervals:
-                    if len(tasks) >= MAX_TASKS:
+                day_blocks.append({
+                    "subject": item["subject"],
+                    "topic": label,
+                    "duration": actual_block,
+                })
+                day_subjects_used.add(item["subject"])
+                day_minutes_used += actual_block + break_minutes
+
+            if not day_blocks:
+                topic_queue[topic_idx % len(topic_queue)]["is_revision"] = True
+                day_count += 1
+                continue
+
+            total_session = sum(b["duration"] for b in day_blocks)
+            subjects_list = list(day_subjects_used)
+            topics_list = [b["topic"] for b in day_blocks]
+            tip = FOCUS_TIPS[tip_idx % len(FOCUS_TIPS)]
+            tip_idx += 1
+
+            session_parts = []
+            for i, b in enumerate(day_blocks):
+                session_parts.append(f"{b['topic']} ({b['duration']} min)")
+                if i < len(day_blocks) - 1:
+                    session_parts.append(f"--- {break_minutes}-min break ---")
+
+            all_tasks.append({
+                "date": current_date,
+                "subjects": subjects_list,
+                "topics": session_parts,
+                "duration_minutes": str(total_session),
+                "notes": f"Focus tip: {tip}",
+            })
+
+            day_count += 1
+
+        for item in topic_queue:
+            item["is_revision"] = True
+
+        remaining_days = total_days - len(all_tasks)
+        if remaining_days > 0 and topic_queue:
+            topic_idx = 0
+            for i in range(remaining_days):
+                current_date = start_date + timedelta(days=len(all_tasks))
+                day_minutes_used = 0
+                day_blocks = []
+
+                while day_minutes_used + block_minutes <= total_available_minutes:
+                    if topic_idx >= len(topic_queue):
+                        topic_idx = 0
+                    item = topic_queue[topic_idx]
+                    topic_idx += 1
+                    remaining = total_available_minutes - day_minutes_used - break_minutes
+                    actual_block = min(block_minutes, remaining)
+                    if actual_block < 15:
                         break
-                    review_date = current_date + timedelta(days=interval)
-                    if review_date <= end_date:
-                        tasks.append({
-                            "date": review_date,
-                            "subjects": [subject_name],
-                            "topics": [f"Review: {t}" for t in daily_topics],
-                            "duration_minutes": str(max(20, session_minutes // 2)),
-                        })
+                    day_blocks.append({
+                        "subject": item["subject"],
+                        "topic": f"Revision: {item['topic']}",
+                        "duration": actual_block,
+                    })
+                    day_minutes_used += actual_block + break_minutes
 
-                day_offset += 1
+                if day_blocks:
+                    total_session = sum(b["duration"] for b in day_blocks)
+                    subjects_list = list(set(b["subject"] for b in day_blocks))
+                    topics_list = [b["topic"] for b in day_blocks]
+                    tip = FOCUS_TIPS[tip_idx % len(FOCUS_TIPS)]
+                    tip_idx += 1
 
-            if len(tasks) >= MAX_TASKS:
-                break
+                    session_parts = []
+                    for j, b in enumerate(day_blocks):
+                        session_parts.append(f"{b['topic']} ({b['duration']} min)")
+                        if j < len(day_blocks) - 1:
+                            session_parts.append(f"--- {break_minutes}-min break ---")
 
-        tasks.sort(key=lambda t: t["date"])
+                    all_tasks.append({
+                        "date": current_date,
+                        "subjects": subjects_list,
+                        "topics": session_parts,
+                        "duration_minutes": str(total_session),
+                        "notes": f"Focus tip: {tip}",
+                    })
 
-        seen_dates = {}
-        deduped = []
-        for task in tasks:
-            key = (task["date"], task["subjects"][0], task["topics"][0])
-            if key not in seen_dates:
-                deduped.append(task)
-                seen_dates[key] = True
-
-        return deduped
+        all_tasks.sort(key=lambda t: t["date"])
+        return all_tasks
 
     def create_plan(
         self,
@@ -177,22 +255,27 @@ class StudyPlanService:
         start_date: date,
         end_date: Optional[date],
         subjects: list[str],
-        use_ai: bool = False,
+        hours_per_day: float = 2.0,
+        subject_topics: Optional[dict[str, list[str]]] = None,
     ) -> dict:
         if not end_date:
             end_date = start_date + timedelta(days=30)
 
-        subject_objs = {s.name: s for s in self.subject_repo.get_all()[0]}
-        valid_subjects = [s for s in subjects if s in subject_objs or True]
+        hours_per_day = max(0.5, min(12.0, hours_per_day))
 
-        topics_per_subject = {}
-        for s_name in valid_subjects:
-            lessons = self.lesson_repo.get_by_subject(subject_objs[s_name].id) if s_name in subject_objs else []
-            topics = []
-            for lesson in lessons:
-                lesson_topics = self.lesson_repo.get_topics(lesson.id)
-                topics.extend(t.title for t in lesson_topics[:5])
-            topics_per_subject[s_name] = topics if topics else [f"{s_name} - Core Topics"]
+        if not subject_topics:
+            subject_topics = {}
+            subject_objs = {s.name: s for s in self.subject_repo.get_all()[0]}
+            for s_name in subjects:
+                if s_name in subject_objs:
+                    lessons = self.lesson_repo.get_by_subject(subject_objs[s_name].id)
+                    topics = []
+                    for lesson in lessons:
+                        lesson_topics = self.lesson_repo.get_topics(lesson.id)
+                        topics.extend(t.title for t in lesson_topics[:5])
+                    subject_topics[s_name] = topics if topics else [f"{s_name} — Core Topics"]
+                else:
+                    subject_topics[s_name] = [f"{s_name} — Core Topics"]
 
         plan = self.repo.create(
             user_id=user_id,
@@ -205,10 +288,11 @@ class StudyPlanService:
         )
 
         daily_tasks = self._scheduling_algorithm(
-            subjects=valid_subjects,
+            subjects=subjects,
             start_date=start_date,
             end_date=end_date,
-            topics_per_subject=topics_per_subject,
+            hours_per_day=hours_per_day,
+            subject_topics=subject_topics,
         )
 
         for task in daily_tasks:
@@ -219,6 +303,7 @@ class StudyPlanService:
                 topics=task["topics"],
                 duration_minutes=task["duration_minutes"],
                 is_completed="false",
+                notes=task.get("notes"),
             )
 
         return self.get_plan(plan.id, user_id)
@@ -243,7 +328,6 @@ class StudyPlanService:
         }
 
     def check_and_suggest_reviews(self, user_id: str, quiz_attempt_id: str) -> Optional[dict]:
-        """Called after quiz submission. If score is low, inserts a review task."""
         attempt = self.quiz_attempt_repo.get(quiz_attempt_id)
         if not attempt:
             return None
@@ -332,18 +416,16 @@ class StudyPlanService:
         end = start + timedelta(days=6)
 
         days = self.repo.get_days_in_range(user_id, start, end)
-        calendar = {}
+        result = []
         for d in days:
-            d_str = d.date.isoformat() if d.date else None
-            if d_str not in calendar:
-                calendar[d_str] = []
-            calendar[d_str].append({
+            result.append({
                 "id": str(d.id),
                 "plan_id": str(d.study_plan_id),
+                "date": d.date.isoformat() if d.date else None,
                 "subjects": d.subjects or [],
                 "topics": d.topics or [],
                 "duration_minutes": d.duration_minutes,
                 "is_completed": d.is_completed,
             })
 
-        return {"start_date": start.isoformat(), "end_date": end.isoformat(), "calendar": calendar}
+        return {"start_date": start.isoformat(), "end_date": end.isoformat(), "days": result}

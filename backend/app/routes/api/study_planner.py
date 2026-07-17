@@ -18,6 +18,8 @@ class CreatePlanRequest(BaseModel):
     start_date: date
     end_date: Optional[date] = None
     subjects: list[str]
+    hours_per_day: float = 2.0
+    subject_topics: Optional[dict[str, list[str]]] = None
     use_ai: bool = False
 
 
@@ -82,6 +84,8 @@ def create_plan(
             start_date=request.start_date,
             end_date=request.end_date,
             subjects=request.subjects,
+            hours_per_day=request.hours_per_day,
+            subject_topics=request.subject_topics,
             use_ai=request.use_ai,
         )
     except ValueError as e:
@@ -100,3 +104,16 @@ def mark_day_completed(
         return result
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.delete("/{plan_id}", response_model=dict)
+def delete_plan(
+    plan_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    service = StudyPlanService(db)
+    deleted = service.delete_plan(plan_id, str(current_user.id))
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Study plan not found")
+    return {"message": "Study plan deleted"}

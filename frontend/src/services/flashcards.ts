@@ -38,4 +38,7 @@ export const flashcardService = {
 
   delete: (flashcardId: string) =>
     api.delete<{ message: string }>(`/flashcards/${flashcardId}`),
+
+  deleteAll: () =>
+    api.delete<{ message: string; deleted: number }>("/flashcards"),
 }

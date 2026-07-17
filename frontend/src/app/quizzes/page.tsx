@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { useQuery, useMutation } from "@tanstack/react-query"
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { useAuthStore } from "@/store/auth"
 import { quizService } from "@/services/quizzes"
 import { subjectService } from "@/services/subjects"
@@ -42,6 +42,8 @@ export default function QuizzesPage() {
     enabled: isAuthenticated,
   })
 
+  const queryClient = useQueryClient()
+
   const generateMutation = useMutation({
     mutationFn: () => aiService.generateQuiz({ subject, topic, difficulty, num_questions: numQuestions }),
     onSuccess: (data) => {
@@ -55,8 +57,6 @@ export default function QuizzesPage() {
       toast.error("Failed to generate quiz. Not enough credits?")
     },
   })
-
-  const queryClient = useQueryClient()
 
   if (!isAuthenticated) return null
 

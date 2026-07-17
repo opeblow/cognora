@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { useQuery } from "@tanstack/react-query"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { useAuthStore } from "@/store/auth"
 import { flashcardService, type Flashcard } from "@/services/flashcards"
 import { Sidebar } from "@/components/layout/sidebar"
@@ -10,7 +10,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
-import { Brain, ChevronLeft, Sparkles, Trash2, RotateCcw, Clock } from "lucide-react"
+import { Brain, ChevronLeft, Sparkles, Trash2, RotateCcw, Clock, RefreshCw } from "lucide-react"
 import { toast } from "sonner"
 
 type View = "list" | "review"
@@ -18,10 +18,12 @@ type View = "list" | "review"
 export default function FlashcardsPage() {
   const router = useRouter()
   const { isAuthenticated } = useAuthStore()
+  const queryClient = useQueryClient()
   const [view, setView] = useState<View>("list")
   const [reviewCard, setReviewCard] = useState<Flashcard | null>(null)
   const [showAnswer, setShowAnswer] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+  const [reviewedCount, setReviewedCount] = useState(0)
 
   useEffect(() => {
     if (!isAuthenticated) router.push("/login")
@@ -50,6 +52,7 @@ export default function FlashcardsPage() {
     }
     setReviewCard(due[0])
     setShowAnswer(false)
+    setReviewedCount(0)
     setView("review")
   }
 
@@ -59,6 +62,7 @@ export default function FlashcardsPage() {
     try {
       await flashcardService.review(reviewCard.id, quality)
       const remaining = due.filter((c) => c.id !== reviewCard.id)
+      setReviewedCount((prev) => prev + 1)
       if (remaining.length > 0) {
         setReviewCard(remaining[0])
         setShowAnswer(false)
@@ -66,7 +70,8 @@ export default function FlashcardsPage() {
         toast.success("All due cards reviewed!")
         setView("list")
         setReviewCard(null)
-        refetch()
+        queryClient.invalidateQueries({ queryKey: ["flashcards"] })
+        queryClient.invalidateQueries({ queryKey: ["flashcards", "due"] })
       }
     } catch (err: unknown) {
       const e = err as { message?: string }
@@ -87,6 +92,18 @@ export default function FlashcardsPage() {
     }
   }
 
+  const handleDeleteAll = async () => {
+    if (!confirm("Delete all flashcards? This cannot be undone.")) return
+    try {
+      await flashcardService.deleteAll()
+      toast.success("All flashcards deleted")
+      queryClient.invalidateQueries({ queryKey: ["flashcards"] })
+    } catch (err: unknown) {
+      const e = err as { message?: string }
+      toast.error(e.message || "Failed to delete flashcards")
+    }
+  }
+
   if (!isAuthenticated) return null
 
   return (
@@ -102,6 +119,18 @@ export default function FlashcardsPage() {
                   <p className="mt-1 text-sm text-gray-600">Spaced repetition for effective memorization</p>
                 </div>
                 <div className="flex items-center gap-3">
+                  {cards.length > 0 && (
+                    <>
+                      <Button variant="outline" onClick={() => router.push("/subjects")} className="gap-2">
+                        <RefreshCw className="h-4 w-4" />
+                        Switch Topic
+                      </Button>
+                      <Button variant="outline" onClick={handleDeleteAll} className="gap-2 text-red-600 hover:text-red-700">
+                        <Trash2 className="h-4 w-4" />
+                        Clear All
+                      </Button>
+                    </>
+                  )}
                   <Button onClick={startReview} className="gap-2" disabled={dueCount === 0}>
                     <Brain className="h-4 w-4" />
                     Review Due ({dueCount})
@@ -197,14 +226,14 @@ export default function FlashcardsPage() {
                 </Button>
               </div>
 
-              <Progress value={((dueCount - due.length) / dueCount) * 100} className="mb-6" />
+              <Progress value={(reviewedCount / dueCount) * 100} className="mb-6" />
 
               <Card className="mb-6 min-h-[300px]">
                 <CardContent className="p-8">
                   <div className="mb-4 flex items-center justify-between">
                     <Badge variant="outline">Question</Badge>
                     <span className="text-xs text-gray-400">
-                      {due.indexOf(reviewCard) + 1} of {dueCount}
+                      {reviewedCount + 1} of {dueCount}
                     </span>
                   </div>
                   <p className="text-lg font-medium text-[#0F172A]">{reviewCard.question}</p>
@@ -228,7 +257,7 @@ export default function FlashcardsPage() {
               ) : (
                 <div>
                   <p className="mb-3 text-center text-sm text-gray-500">How well did you remember?</p>
-                  <div className="grid grid-cols-5 gap-2">
+                  <div className="grid grid-cols-6 gap-2">
                     <Button variant="outline" onClick={() => handleReview(0)} disabled={submitting} className="flex-col py-4 text-xs">
                       <span className="text-lg">0</span>
                       <span>Blackout</span>
@@ -244,6 +273,10 @@ export default function FlashcardsPage() {
                     <Button variant="outline" onClick={() => handleReview(3)} disabled={submitting} className="flex-col py-4 text-xs">
                       <span className="text-lg">3</span>
                       <span>Good</span>
+                    </Button>
+                    <Button variant="outline" onClick={() => handleReview(4)} disabled={submitting} className="flex-col py-4 text-xs">
+                      <span className="text-lg">4</span>
+                      <span>Easy</span>
                     </Button>
                     <Button variant="default" onClick={() => handleReview(5)} disabled={submitting} className="flex-col py-4 text-xs">
                       <span className="text-lg">5</span>
