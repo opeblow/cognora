@@ -116,10 +116,8 @@ def create_app() -> FastAPI:
             deps["status"] = "degraded"
             status_code = 503
         try:
-            from app.workers.celery_app import celery_app
-            inspector = celery_app.control.inspect(timeout=2)
-            active = inspector.active() or {}
-            deps["celery"] = "connected" if active else "no workers"
+            from app.utils.celery_safe import _broker_available as celery_ok
+            deps["celery"] = "available" if celery_ok else "broker unavailable"
         except Exception:
             deps["celery"] = "unavailable"
         return JSONResponse(content=deps, status_code=status_code)

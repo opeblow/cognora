@@ -4,9 +4,11 @@ from app.database.base import get_db
 from app.dependencies.auth import get_current_user
 from app.models.user import User
 from app.models.content_issue import ContentIssue
-from app.workers.tasks import review_content_issue
 from pydantic import BaseModel
 from typing import Optional
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/issues", tags=["Issues"])
 
@@ -38,12 +40,13 @@ def create_issue(
     db.commit()
     db.refresh(issue)
 
-    review_content_issue.delay(str(issue.id))
+    from app.utils.celery_safe import safe_celery_delay
+    safe_celery_delay("app.workers.tasks.review_content_issue", str(issue.id))
 
     return {
         "id": str(issue.id),
         "status": "open",
-        "message": "Issue reported. Our AI is reviewing it.",
+        "message": "Issue reported. Our AI will review it shortly.",
     }
 
 

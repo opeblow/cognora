@@ -62,8 +62,8 @@ def upload_audio(
     db.commit()
     db.refresh(record)
 
-    from app.workers.tasks import transcribe_audio
-    transcribe_audio.delay(str(record.id))
+    from app.utils.celery_safe import safe_celery_delay
+    safe_celery_delay("app.workers.tasks.transcribe_audio", str(record.id))
 
     return AudioUploadResponse(
         id=record.id,
@@ -217,7 +217,7 @@ def process_audio(
             "ai_feedback": record.ai_feedback,
         }
 
-    from app.workers.tasks import transcribe_audio
-    transcribe_audio.delay(audio_id)
+    from app.utils.celery_safe import safe_celery_delay
+    safe_celery_delay("app.workers.tasks.transcribe_audio", audio_id)
 
     return {"message": "Processing started", "audio_id": audio_id}

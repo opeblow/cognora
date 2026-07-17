@@ -17,6 +17,9 @@ celery_app.conf.update(
     task_track_started=True,
     task_time_limit=30 * 60,
     task_soft_time_limit=25 * 60,
+    broker_connection_timeout=5,
+    broker_connection_retry_on_startup=True,
+    broker_transport_options={"connect_timeout": 5},
     task_routes={
         "app.workers.tasks.reset_weekly_credits": {"queue": "cpu"},
         "app.workers.tasks.cleanup_expired_tokens": {"queue": "cpu"},

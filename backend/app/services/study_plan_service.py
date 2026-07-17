@@ -294,6 +294,7 @@ class StudyPlanService:
         subjects: list[str],
         hours_per_day: float = 2.0,
         subject_topics: Optional[dict[str, list[str]]] = None,
+        use_ai: bool = False,
     ) -> dict:
         if not end_date:
             end_date = start_date + timedelta(days=30)
