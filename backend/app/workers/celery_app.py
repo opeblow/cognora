@@ -3,8 +3,8 @@ from app.core.config import settings
 
 celery_app = Celery(
     "cognora",
-    broker=settings.REDIS_URL,
-    backend=settings.REDIS_URL,
+    broker=settings.CELERY_BROKER_URL or settings.broker_redis_url,
+    backend=settings.CELERY_RESULT_BACKEND_URL or settings.broker_redis_url,
     include=["app.workers.tasks"],
 )
 
@@ -17,6 +17,16 @@ celery_app.conf.update(
     task_track_started=True,
     task_time_limit=30 * 60,
     task_soft_time_limit=25 * 60,
+    task_routes={
+        "app.workers.tasks.reset_weekly_credits": {"queue": "cpu"},
+        "app.workers.tasks.cleanup_expired_tokens": {"queue": "cpu"},
+        "app.workers.tasks.send_email": {"queue": "io"},
+        "app.workers.tasks.process_ocr": {"queue": "io"},
+        "app.workers.tasks.transcribe_audio": {"queue": "io"},
+        "app.workers.tasks.pre_generate_textbook_sections": {"queue": "io"},
+        "app.workers.tasks.review_content_issue": {"queue": "io"},
+        "app.workers.tasks.pre_generate_question_pool": {"queue": "io"},
+    },
     beat_schedule={
         "reset-weekly-credits": {
             "task": "app.workers.tasks.reset_weekly_credits",

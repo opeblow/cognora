@@ -11,7 +11,9 @@ from app.core.logging import setup_logging
 from app.middleware.cors import setup_cors
 from app.middleware.rate_limit import RateLimitMiddleware
 from app.middleware.request_id import RequestIDMiddleware
-from app.routes.api import auth, subjects, ai, quizzes, exams, dashboard, credits, lessons, textbook, study_planner, analytics as analytics_router, settings as settings_router, upload, audio, live, gamification, lobby, flashcard, payments, issues, content
+from app.middleware.prometheus import PrometheusMiddleware
+from app.core.sentry import init_sentry
+from app.routes.api import auth, subjects, ai, quizzes, exams, dashboard, credits, lessons, textbook, study_planner, analytics as analytics_router, settings as settings_router, upload, audio, live, gamification, lobby, flashcard, payments, issues, content, study_groups, past_questions
 from app.database.base import engine
 from app.database.redis import get_redis
 
@@ -42,6 +44,8 @@ async def lifespan(app: FastAPI):
 
 
 def create_app() -> FastAPI:
+    init_sentry()
+
     app = FastAPI(
         title=settings.APP_NAME,
         version=settings.APP_VERSION,
@@ -52,6 +56,7 @@ def create_app() -> FastAPI:
     )
 
     setup_cors(app)
+    app.add_middleware(PrometheusMiddleware)
     app.add_middleware(RequestIDMiddleware)
     app.add_middleware(RateLimitMiddleware)
 
@@ -80,14 +85,16 @@ def create_app() -> FastAPI:
         study_planner.router, analytics_router.router, settings_router.router,
         upload.router, audio.router, live.router, gamification.router,
         lobby.router, flashcard.router, payments.router, issues.router,
-        content.router,
+        content.router, study_groups.router, past_questions.router,
     ]
     for router in routers:
         app.include_router(router, prefix="/api")
 
     @app.get("/api/health")
     async def health_check():
+        from fastapi.responses import JSONResponse
         deps = {"status": "ok", "version": settings.APP_VERSION}
+        status_code = 200
         try:
             def _check_db():
                 with engine.connect() as conn:
@@ -98,6 +105,7 @@ def create_app() -> FastAPI:
             logger.warning("Health database check failed: %s", e)
             deps["database"] = "unavailable"
             deps["status"] = "degraded"
+            status_code = 503
         try:
             client = await get_redis()
             await client.ping()
@@ -106,7 +114,15 @@ def create_app() -> FastAPI:
             logger.warning("Health Redis check failed: %s", e)
             deps["redis"] = "unavailable"
             deps["status"] = "degraded"
-        return deps
+            status_code = 503
+        try:
+            from app.workers.celery_app import celery_app
+            inspector = celery_app.control.inspect(timeout=2)
+            active = inspector.active() or {}
+            deps["celery"] = "connected" if active else "no workers"
+        except Exception:
+            deps["celery"] = "unavailable"
+        return JSONResponse(content=deps, status_code=status_code)
 
     return app
 

@@ -1,0 +1,41 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: "cognora-backend"
+    metrics_path: "/api/metrics"
+    static_configs:
+      - targets: ["backend-1:8000", "backend-2:8000"]
+        labels:
+          service: "cognora-backend"
+
+  - job_name: "cognora-postgres"
+    static_configs:
+      - targets: ["postgres-exporter:9187"]
+        labels:
+          service: "cognora-postgres"
+
+  - job_name: "cognora-redis-cache"
+    static_configs:
+      - targets: ["redis-cache-exporter:9121"]
+        labels:
+          service: "cognora-redis-cache"
+
+  - job_name: "cognora-redis-broker"
+    static_configs:
+      - targets: ["redis-broker-exporter:9121"]
+        labels:
+          service: "cognora-redis-broker"
+
+  - job_name: "cognora-celery"
+    static_configs:
+      - targets: ["celery-worker-1:9808", "celery-worker-2:9808"]
+        labels:
+          service: "cognora-celery"
+
+  - job_name: "cognora-nginx"
+    static_configs:
+      - targets: ["nginx-exporter:9113"]
+        labels:
+          service: "cognora-nginx"

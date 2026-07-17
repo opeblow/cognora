@@ -1,4 +1,5 @@
 from sqlalchemy.orm import Session
+from sqlalchemy import select
 from app.repositories.user import UserRepository
 from app.repositories.progress import UserProgressRepository
 from app.repositories.quiz import QuizAttemptRepository
@@ -6,6 +7,7 @@ from app.repositories.exam import ExamResultRepository
 from app.repositories.credit import CreditTransactionRepository
 from app.repositories.subject import SubjectRepository
 from app.core.config import settings
+from app.models.subject import Subject
 
 
 class DashboardService:
@@ -27,9 +29,18 @@ class DashboardService:
         weekly_remaining = max(0, settings.FREE_WEEKLY_CREDITS - weekly_used)
 
         progress = self.progress_repo.get_by_user(user_id)
+
+        subject_ids = list({p.subject_id for p in progress})
+        subjects_map = {}
+        if subject_ids:
+            subjects = self.db.execute(
+                select(Subject).where(Subject.id.in_(subject_ids))
+            ).scalars().all()
+            subjects_map = {str(s.id): s for s in subjects}
+
         subject_stats = []
         for p in progress:
-            subject = self.subject_repo.get(p.subject_id)
+            subject = subjects_map.get(str(p.subject_id))
             if subject:
                 try:
                     lessons_completed = int(p.lessons_completed) if p.lessons_completed else 0

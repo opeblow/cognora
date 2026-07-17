@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 export default function RecordError({ error, reset }: { error: Error; reset: () => void }) {
   return (
@@ -9,7 +9,7 @@ export default function RecordError({ error, reset }: { error: Error; reset: () 
           <span className="text-lg font-bold text-[#0F172A]">Cognora</span>
         </div>
       </aside>
-      <main className="ml-64 flex-1 p-8">
+      <main className="lg:ml-64 p-4 lg:p-8 pt-16 lg:pt-8">
         <div className="mx-auto max-w-2xl pt-20 text-center">
           <h1 className="text-2xl font-bold text-gray-900">Something went wrong</h1>
           <p className="mt-2 text-sm text-gray-600">

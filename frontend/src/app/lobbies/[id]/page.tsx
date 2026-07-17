@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useRef } from "react"
+import { useEffect, useState, useRef, useCallback } from "react"
 import { useRouter, useParams } from "next/navigation"
 import { useQuery } from "@tanstack/react-query"
 import { useAuthStore } from "@/store/auth"
@@ -33,6 +33,7 @@ export default function LobbyDetailPage() {
   }, [isAuthenticated, router])
 
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const reconnectAttemptRef = useRef(0)
 
   const { data: lobby, isLoading } = useQuery({
     queryKey: ["lobby", lobbyId],
@@ -54,14 +55,18 @@ export default function LobbyDetailPage() {
     }
   }, [history])
 
-  useEffect(() => {
+  const connectWs = useCallback(() => {
     if (!lobbyId || !lobby?.is_active) return
+    if (wsRef.current && (wsRef.current.readyState === WebSocket.OPEN || wsRef.current.readyState === WebSocket.CONNECTING)) {
+      return
+    }
 
     const ws = new WebSocket(`${WS_URL}/api/lobbies/${lobbyId}/ws`)
     wsRef.current = ws
 
     ws.onopen = () => {
       setConnected(true)
+      reconnectAttemptRef.current = 0
       ws.send(JSON.stringify({
         username: user?.full_name || "Anonymous",
         user_id: user?.id,
@@ -89,30 +94,34 @@ export default function LobbyDetailPage() {
 
     ws.onerror = () => {
       setConnected(false)
-      toast.error("Connection lost. Try refreshing.")
     }
 
     ws.onclose = () => {
       setConnected(false)
-      if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current)
+      const attempt = reconnectAttemptRef.current
+      const delay = Math.min(1000 * Math.pow(2, attempt), 30000)
+      reconnectAttemptRef.current = attempt + 1
       reconnectTimeoutRef.current = setTimeout(() => {
         reconnectTimeoutRef.current = null
-      }, 5000)
-    }
-
-    return () => {
-      if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current)
-      ws.close()
+        connectWs()
+      }, delay)
     }
   }, [lobbyId, lobby?.is_active, user])
 
   useEffect(() => {
-    if (!connected && lobbyId && lobby?.is_active && reconnectTimeoutRef.current === null) {
-      reconnectTimeoutRef.current = setTimeout(() => {
-        reconnectTimeoutRef.current = null
-      }, 5000)
+    if (lobby?.is_active) {
+      connectWs()
     }
-  }, [connected, lobbyId, lobby?.is_active])
+    return () => {
+      if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current)
+      reconnectAttemptRef.current = 0
+      if (wsRef.current) {
+        wsRef.current.onclose = null
+        wsRef.current.close()
+        wsRef.current = null
+      }
+    }
+  }, [lobbyId, lobby?.is_active, connectWs])
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -136,7 +145,7 @@ export default function LobbyDetailPage() {
     return (
       <div className="flex min-h-screen bg-[#F8FAFC]">
         <Sidebar />
-        <main className="ml-64 flex-1 p-8">
+        <main className="lg:ml-64 p-4 lg:p-8 pt-16 lg:pt-8">
           <div className="mx-auto max-w-4xl pt-20 text-center">
             <Loader2 className="mx-auto h-8 w-8 animate-spin text-[#14B8A6]" />
             <p className="mt-4 text-gray-500">Loading lobby...</p>
@@ -149,7 +158,7 @@ export default function LobbyDetailPage() {
   return (
     <div className="flex min-h-screen bg-[#F8FAFC]">
       <Sidebar />
-      <main className="ml-64 flex flex-1 flex-col">
+      <main className="lg:ml-64 flex flex-1 flex-col pt-14 lg:pt-0">
         <div className="border-b border-gray-100 bg-white px-8 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">

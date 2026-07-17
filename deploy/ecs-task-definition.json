@@ -1,0 +1,57 @@
+{
+  "family": "cognora-backend",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "2048",
+  "memory": "4096",
+  "executionRoleArn": "arn:aws:iam::role/ecsTaskExecutionRole",
+  "taskRoleArn": "arn:aws:iam::role/cognora-task-role",
+  "containerDefinitions": [
+    {
+      "name": "backend",
+      "image": "ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/cognora-backend:latest",
+      "portMappings": [
+        {
+          "containerPort": 8000,
+          "protocol": "tcp"
+        }
+      ],
+      "environment": [
+        { "name": "DATABASE_URL", "value": "postgresql://cognora:PASSWORD@pgbouncer-host:6432/cognora" },
+        { "name": "DATABASE_READ_REPLICA_URL", "value": "postgresql://cognora:PASSWORD@replica-host:5432/cognora" },
+        { "name": "REDIS_URL", "value": "redis://redis-cache-host:6379/0" },
+        { "name": "REDIS_CACHE_URL", "value": "redis://redis-cache-host:6379/0" },
+        { "name": "REDIS_BROKER_URL", "value": "redis://redis-broker-host:6379/1" },
+        { "name": "CELERY_BROKER_URL", "value": "redis://redis-broker-host:6379/1" },
+        { "name": "CELERY_RESULT_BACKEND_URL", "value": "redis://redis-broker-host:6379/2" },
+        { "name": "SENTRY_DSN", "value": "https://YOUR_DSN@sentry.io/PROJECT_ID" },
+        { "name": "DEBUG", "value": "false" }
+      ],
+      "secrets": [
+        { "name": "SECRET_KEY", "valueFrom": "arn:aws:secretsmanager:us-east-1:ACCOUNT_ID:secret:cognora/secret-key" },
+        { "name": "OPENAI_API_KEY", "valueFrom": "arn:aws:secretsmanager:us-east-1:ACCOUNT_ID:secret:cognora/openai-key" },
+        { "name": "BRAVE_API_KEY", "valueFrom": "arn:aws:secretsmanager:us-east-1:ACCOUNT_ID:secret:cognora/brave-key" },
+        { "name": "RESEND_API_KEY", "valueFrom": "arn:aws:secretsmanager:us-east-1:ACCOUNT_ID:secret:cognora/resend-key" }
+      ],
+      "healthCheck": {
+        "command": ["CMD-SHELL", "curl -f http://localhost:8000/api/health || exit 1"],
+        "interval": 30,
+        "timeout": 5,
+        "retries": 3,
+        "startPeriod": 60
+      },
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/cognora-backend",
+          "awslogs-region": "us-east-1",
+          "awslogs-stream-prefix": "ecs",
+          "awslogs-create-group": "true"
+        }
+      },
+      "linuxParameters": {
+        "initProcessEnabled": true
+      }
+    }
+  ]
+}

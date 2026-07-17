@@ -69,13 +69,21 @@ class AnalyticsService:
         quiz_attempts = self.quiz_attempt_repo.get_by_user(user_id)
         exam_results = self.exam_result_repo.get_by_user(user_id)
 
+        subject_ids = list({p.subject_id for p in progress})
+        subjects_map = {}
+        if subject_ids:
+            subjects = self.db.execute(
+                select(Subject).where(Subject.id.in_(subject_ids))
+            ).scalars().all()
+            subjects_map = {str(s.id): s for s in subjects}
+
         subject_stats = []
         total_quiz = 0
         total_exam = 0
         overall_scores = []
 
         for p in progress:
-            subject = self.subject_repo.get(p.subject_id)
+            subject = subjects_map.get(str(p.subject_id))
             if subject:
                 def safe_int(v):
                     try:
@@ -220,31 +228,44 @@ class AnalyticsService:
                 return int(v) if v is not None else 0
             except (ValueError, TypeError):
                 return 0
-        progress = self.progress_repo.get_by_user(user_id)
-        mastery = []
 
+        progress = self.progress_repo.get_by_user(user_id)
+
+        subject_ids = list({p.subject_id for p in progress})
+        subjects_map = {}
+        if subject_ids:
+            subjects = self.db.execute(
+                select(Subject).where(Subject.id.in_(subject_ids))
+            ).scalars().all()
+            subjects_map = {str(s.id): s for s in subjects}
+
+        all_attempts = (
+            self.db.query(QuizAttempt)
+            .filter(QuizAttempt.user_id == user_id)
+            .all()
+        )
+
+        attempts_by_subject: dict[str, list] = {}
+        for a in all_attempts:
+            if a.quiz:
+                sid = str(a.quiz.subject_id)
+                attempts_by_subject.setdefault(sid, []).append(a)
+
+        mastery = []
         for p in progress:
-            subject = self.subject_repo.get(p.subject_id)
+            subject = subjects_map.get(str(p.subject_id))
             if not subject:
                 continue
 
-            attempts = (
-                self.db.query(QuizAttempt)
-                .filter(
-                    QuizAttempt.user_id == user_id,
-                )
-                .all()
-            )
-
+            subject_attempts = attempts_by_subject.get(str(p.subject_id), [])
             subject_name = subject.name
             quiz_scores = []
-            study_completion = 0
 
             lessons = subject.lessons if hasattr(subject, 'lessons') else []
             total_lessons = max(1, len(lessons))
 
-            for a in attempts:
-                if a.quiz and str(a.quiz.subject_id) == str(p.subject_id) and a.percentage:
+            for a in subject_attempts:
+                if a.percentage:
                     try:
                         quiz_scores.append(float(a.percentage))
                     except (ValueError, TypeError):

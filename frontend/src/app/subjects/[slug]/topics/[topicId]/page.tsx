@@ -52,6 +52,14 @@ export default function TopicDetailPage() {
     queryKey: ["textbook-status", slug, topicId],
     queryFn: () => lessonService.getTextbookStatus(slug, topicId),
     enabled: isAuthenticated && !!topicData,
+    refetchInterval: (query) => {
+      const status = query.state.data
+      if (status?.sections) {
+        const generating = status.sections.some((s: { status: string }) => s.status === "generating" || s.status === "queued")
+        return generating ? 5000 : false
+      }
+      return false
+    },
   })
 
   const loadSectionContent = useCallback(async (sectionIndex: number) => {
@@ -141,7 +149,7 @@ export default function TopicDetailPage() {
     return (
       <div className="flex min-h-screen bg-[#F8FAFC]">
         <Sidebar />
-        <main className="ml-64 flex-1 p-8">
+        <main className="lg:ml-64 p-4 lg:p-8 pt-16 lg:pt-8">
           <div className="mx-auto max-w-4xl pt-20 text-center">
             <Loader2 className="mx-auto h-8 w-8 animate-spin text-[#2563EB]" />
             <p className="mt-4 text-gray-500">Loading topic...</p>
@@ -155,7 +163,7 @@ export default function TopicDetailPage() {
     return (
       <div className="flex min-h-screen bg-[#F8FAFC]">
         <Sidebar />
-        <main className="ml-64 flex-1 p-8">
+        <main className="lg:ml-64 p-4 lg:p-8 pt-16 lg:pt-8">
           <div className="mx-auto max-w-4xl pt-20 text-center">
             <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-red-50">
               <BookOpen className="h-8 w-8 text-red-400" />
@@ -184,7 +192,7 @@ export default function TopicDetailPage() {
   return (
     <div className="flex min-h-screen bg-[#F8FAFC]">
       <Sidebar />
-      <main className="ml-64 flex-1 p-8">
+      <main className="lg:ml-64 p-4 lg:p-8 pt-16 lg:pt-8">
         <div className="mx-auto max-w-4xl">
           <div className="mb-6">
             <Link

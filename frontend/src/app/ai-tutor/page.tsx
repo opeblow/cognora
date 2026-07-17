@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useState, useRef, useEffect } from "react"
 import { useRouter } from "next/navigation"
@@ -72,7 +72,7 @@ export default function AITutorPage() {
   return (
     <div className="flex min-h-screen bg-[#F8FAFC]">
       <Sidebar />
-      <main className="ml-64 flex flex-1 flex-col">
+      <main className="lg:ml-64 flex flex-1 flex-col pt-14 lg:pt-0">
         <div className="border-b border-gray-100 bg-white px-8 py-4">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#2563EB]/10">

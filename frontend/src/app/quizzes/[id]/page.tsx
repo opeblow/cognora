@@ -101,7 +101,7 @@ export default function QuizDetailPage() {
     return (
       <div className="flex min-h-screen bg-[#F8FAFC]">
         <Sidebar />
-        <main className="ml-64 flex-1 p-8">
+        <main className="lg:ml-64 p-4 lg:p-8 pt-16 lg:pt-8">
           <div className="mx-auto max-w-3xl">
             <div className="mb-6">
               <div className="h-8 w-64 animate-pulse rounded bg-gray-200" />
@@ -127,7 +127,7 @@ export default function QuizDetailPage() {
     return (
       <div className="flex min-h-screen bg-[#F8FAFC]">
         <Sidebar />
-        <main className="ml-64 flex-1 p-8">
+        <main className="lg:ml-64 p-4 lg:p-8 pt-16 lg:pt-8">
           <div className="mx-auto max-w-2xl">
             <Card>
               <CardHeader className="text-center">
@@ -201,7 +201,7 @@ export default function QuizDetailPage() {
   return (
     <div className="flex min-h-screen bg-[#F8FAFC]">
       <Sidebar />
-      <main className="ml-64 flex-1 p-8">
+      <main className="lg:ml-64 p-4 lg:p-8 pt-16 lg:pt-8">
         <div className="mx-auto max-w-3xl">
           <div className="mb-6 flex items-center justify-between">
             <div>

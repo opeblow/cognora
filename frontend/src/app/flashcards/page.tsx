@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
@@ -85,7 +85,7 @@ export default function FlashcardsPage() {
     try {
       await flashcardService.delete(id)
       toast.success("Card deleted")
-      refetch()
+      queryClient.invalidateQueries({ queryKey: ["flashcards"] })
     } catch (err: unknown) {
       const e = err as { message?: string }
       toast.error(e.message || "Failed to delete card")
@@ -109,7 +109,7 @@ export default function FlashcardsPage() {
   return (
     <div className="flex min-h-screen bg-[#F8FAFC]">
       <Sidebar />
-      <main className="ml-64 flex-1 p-8">
+      <main className="lg:ml-64 p-4 lg:p-8 pt-16 lg:pt-8">
         <div className="mx-auto max-w-4xl">
           {view === "list" && (
             <>

@@ -10,7 +10,7 @@ from app.core.config import settings
 logger = logging.getLogger(__name__)
 
 
-@celery_app.task
+@celery_app.task(queue="cpu")
 def reset_weekly_credits():
     from sqlalchemy import update
     from app.models.user import User
@@ -35,14 +35,14 @@ def reset_weekly_credits():
         db.close()
 
 
-@celery_app.task
+@celery_app.task(queue="io")
 def send_email(to: str, subject: str, body: str):
     from app.utils.email import EmailService
     service = EmailService()
     service.send_email(to, subject, body)
 
 
-@celery_app.task
+@celery_app.task(queue="cpu")
 def cleanup_expired_tokens():
     db = SessionLocal()
     try:
@@ -61,7 +61,7 @@ def cleanup_expired_tokens():
         db.close()
 
 
-@celery_app.task(bind=True, max_retries=3, default_retry_delay=60)
+@celery_app.task(bind=True, max_retries=3, default_retry_delay=60, queue="io")
 def process_ocr(self, file_id: str):
     from app.services.ocr_service import OcrService
     from app.services.file_storage_service import FileUploadService
@@ -93,7 +93,7 @@ def process_ocr(self, file_id: str):
         db.close()
 
 
-@celery_app.task(bind=True, max_retries=3, default_retry_delay=60)
+@celery_app.task(bind=True, max_retries=3, default_retry_delay=60, queue="io")
 def transcribe_audio(self, audio_id: str):
     from app.services.audio_service import AudioService
     from app.models.audio_recording import AudioRecording
@@ -142,7 +142,7 @@ def _run_async(coro):
             loop.close()
 
 
-@celery_app.task(bind=True, max_retries=2, default_retry_delay=30)
+@celery_app.task(bind=True, max_retries=2, default_retry_delay=30, queue="io")
 def pre_generate_textbook_sections(self):
     from sqlalchemy import select
     from app.models.lesson import Topic, Lesson
@@ -205,7 +205,7 @@ def pre_generate_textbook_sections(self):
         db.close()
 
 
-@celery_app.task(bind=True, max_retries=3, default_retry_delay=60)
+@celery_app.task(bind=True, max_retries=3, default_retry_delay=60, queue="io")
 def review_content_issue(self, issue_id: str):
     import json
     from openai import OpenAI
@@ -272,7 +272,7 @@ Respond in JSON format:
         db.close()
 
 
-@celery_app.task(bind=True, max_retries=2, default_retry_delay=30, autoretry_for=(Exception,))
+@celery_app.task(bind=True, max_retries=2, default_retry_delay=30, autoretry_for=(Exception,), queue="io")
 def pre_generate_question_pool(self):
     from sqlalchemy import select, func
     from app.models.subject import Subject

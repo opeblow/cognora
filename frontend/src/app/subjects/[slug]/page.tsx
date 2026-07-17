@@ -40,7 +40,7 @@ export default function SubjectDetailPage() {
   return (
     <div className="flex min-h-screen bg-[#F8FAFC]">
       <Sidebar />
-      <main className="ml-64 flex-1 p-8">
+      <main className="lg:ml-64 p-4 lg:p-8 pt-16 lg:pt-8">
         <div className="mx-auto max-w-4xl">
           <div className="mb-8">
             <div className="flex items-center gap-3">

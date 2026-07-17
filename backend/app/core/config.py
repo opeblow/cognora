@@ -10,7 +10,12 @@ class Settings(BaseSettings):
     DEBUG: bool = False
 
     DATABASE_URL: str = ""
+    DATABASE_READ_REPLICA_URL: str = ""
     REDIS_URL: str = ""
+    REDIS_CACHE_URL: str = ""
+    REDIS_BROKER_URL: str = ""
+    CELERY_BROKER_URL: str = ""
+    CELERY_RESULT_BACKEND_URL: str = ""
 
     SECRET_KEY: str = ""
     ALGORITHM: str = "HS256"
@@ -96,6 +101,14 @@ class Settings(BaseSettings):
             import warnings
             warnings.warn("SECRET_KEY is not set or is using the default value. Set a strong random secret in production.")
         return self.SECRET_KEY
+
+    @property
+    def cache_redis_url(self) -> str:
+        return self.REDIS_CACHE_URL or self.REDIS_URL
+
+    @property
+    def broker_redis_url(self) -> str:
+        return self.REDIS_BROKER_URL or self.REDIS_URL
 
 
 settings = Settings()

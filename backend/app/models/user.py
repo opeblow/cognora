@@ -44,6 +44,8 @@ class User(Base):
     badges = relationship("UserBadge", back_populates="user", cascade="all, delete-orphan")
     created_lobbies = relationship("StudyLobby", back_populates="creator", cascade="all, delete-orphan")
     flashcards = relationship("Flashcard", back_populates="user", cascade="all, delete-orphan")
+    created_study_groups = relationship("StudyGroup", back_populates="creator", cascade="all, delete-orphan")
+    study_group_memberships = relationship("StudyGroupMember", back_populates="user", cascade="all, delete-orphan")
 
 
 class EmailVerification(Base):

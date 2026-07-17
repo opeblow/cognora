@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useEffect } from "react"
 import { useRouter } from "next/navigation"
@@ -26,6 +26,7 @@ export default function DashboardPage() {
     queryKey: ["dashboard"],
     queryFn: dashboardService.get,
     enabled: isAuthenticated,
+    staleTime: 60 * 1000,
   })
 
   if (!isAuthenticated) return null
@@ -33,7 +34,7 @@ export default function DashboardPage() {
   return (
     <div className="flex min-h-screen bg-[#F8FAFC]">
       <Sidebar />
-      <main className="ml-64 flex-1 p-8">
+      <main className="lg:ml-64 p-4 lg:p-8 pt-16 lg:pt-8">
         <div className="mx-auto max-w-6xl">
           <div className="mb-8">
             <h1 className="text-2xl font-bold text-[#0F172A]">

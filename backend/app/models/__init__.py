@@ -24,6 +24,8 @@ from app.models.lobby import StudyLobby, LobbyMessage
 from app.models.flashcard import Flashcard, FlashcardReview
 from app.models.syllabus import Syllabus
 from app.models.quiz_session import QuizSession
+from app.models.study_group import StudyGroup, StudyGroupMember, StudyGroupMessage
+from app.models.past_question import PastQuestion
 
 __all__ = [
     "User", "EmailVerification", "PasswordReset",
@@ -47,6 +49,8 @@ __all__ = [
     "StudyLobby", "LobbyMessage",
     "Flashcard", "FlashcardReview",
     "Syllabus",
+    "PastQuestion",
+    "StudyGroup", "StudyGroupMember", "StudyGroupMessage",
 ]
 
 

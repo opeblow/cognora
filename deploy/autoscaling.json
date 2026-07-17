@@ -1,0 +1,60 @@
+{
+  "ScalableTargets": [
+    {
+      "ServiceNamespace": "ecs",
+      "ResourceId": "service/cognora-cluster/cognora-backend",
+      "ScalableDimension": "ecs:service:DesiredCount",
+      "MinCapacity": 2,
+      "MaxCapacity": 20,
+      "RoleARN": "arn:aws:iam::role/aws-service-role/ecs.application-autoscaling.amazonaws.com/AWSServiceRoleForApplicationAutoScaling_ECSService"
+    }
+  ],
+  "ScalingPolicies": [
+    {
+      "PolicyName": "CpuTargetTracking",
+      "PolicyType": "TargetTrackingScaling",
+      "ServiceNamespace": "ecs",
+      "ResourceId": "service/cognora-cluster/cognora-backend",
+      "ScalableDimension": "ecs:service:DesiredCount",
+      "TargetTrackingScalingPolicyConfiguration": {
+        "PredefinedMetricSpecification": {
+          "PredefinedMetricType": "ECSServiceAverageCPUUtilization"
+        },
+        "TargetValue": 70.0,
+        "ScaleInCooldown": { "ValueInSeconds": 300 },
+        "ScaleOutCooldown": { "ValueInSeconds": 60 }
+      }
+    },
+    {
+      "PolicyName": "MemoryTargetTracking",
+      "PolicyType": "TargetTrackingScaling",
+      "ServiceNamespace": "ecs",
+      "ResourceId": "service/cognora-cluster/cognora-backend",
+      "ScalableDimension": "ecs:service:DesiredCount",
+      "TargetTrackingScalingPolicyConfiguration": {
+        "PredefinedMetricSpecification": {
+          "PredefinedMetricType": "ECSServiceAverageMemoryUtilization"
+        },
+        "TargetValue": 75.0,
+        "ScaleInCooldown": { "ValueInSeconds": 300 },
+        "ScaleOutCooldown": { "ValueInSeconds": 60 }
+      }
+    },
+    {
+      "PolicyName": "RequestCountScaling",
+      "PolicyType": "TargetTrackingScaling",
+      "ServiceNamespace": "ecs",
+      "ResourceId": "service/cognora-cluster/cognora-backend",
+      "ScalableDimension": "ecs:service:DesiredCount",
+      "TargetTrackingScalingPolicyConfiguration": {
+        "PredefinedMetricSpecification": {
+          "PredefinedMetricType": "ALBRequestCountPerTarget",
+          "ResourceLabel": "app/cognora-alb/50dc6c495c0c9188/TargetGroup/cognora-backend/abcd1234"
+        },
+        "TargetValue": 1000.0,
+        "ScaleInCooldown": { "ValueInSeconds": 300 },
+        "ScaleOutCooldown": { "ValueInSeconds": 30 }
+      }
+    }
+  ]
+}

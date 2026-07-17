@@ -101,12 +101,13 @@ async def get_redis():
     global _client
     if _client is not None:
         return _client
-    if not settings.REDIS_URL:
+    redis_url = settings.cache_redis_url
+    if not redis_url:
         logger.info("REDIS_URL not set, using in-memory fallback")
         _client = NullRedis()
         return _client
     try:
-        c = aioredis.from_url(settings.REDIS_URL, decode_responses=True)
+        c = aioredis.from_url(redis_url, decode_responses=True)
         await c.ping()
         _client = c
         logger.info("Connected to Redis")

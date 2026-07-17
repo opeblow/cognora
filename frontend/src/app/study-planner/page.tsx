@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useEffect, useState, useMemo } from "react"
 import { useRouter } from "next/navigation"
@@ -116,6 +116,9 @@ export default function StudyPlannerPage() {
     mutationFn: (dayId: string) => studyPlanService.markDayCompleted(dayId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["study-plans"] })
+      queryClient.invalidateQueries({ queryKey: ["study-plans", "today"] })
+      queryClient.invalidateQueries({ queryKey: ["study-plans", "calendar"] })
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] })
       toast.success("Day marked as completed!")
     },
     onError: (err: Error) => toast.error(err.message || "Failed to update"),
@@ -125,6 +128,8 @@ export default function StudyPlannerPage() {
     mutationFn: (planId: string) => studyPlanService.deletePlan(planId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["study-plans"] })
+      queryClient.invalidateQueries({ queryKey: ["study-plans", "today"] })
+      queryClient.invalidateQueries({ queryKey: ["study-plans", "calendar"] })
       toast.success("Plan deleted")
       if (viewingPlan) setViewingPlan(null)
     },
@@ -194,7 +199,7 @@ export default function StudyPlannerPage() {
     return (
       <div className="flex min-h-screen bg-[#F8FAFC]">
         <Sidebar />
-        <main className="ml-64 flex-1 p-8">
+        <main className="lg:ml-64 p-4 lg:p-8 pt-16 lg:pt-8">
           <div className="mx-auto max-w-4xl">
             <div className="mb-6 flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -204,7 +209,7 @@ export default function StudyPlannerPage() {
                 <div>
                   <h1 className="text-2xl font-bold text-[#0F172A]">{viewingPlan.title}</h1>
                   <p className="mt-1 text-sm text-gray-600">
-                    {viewingPlan.start_date} — {viewingPlan.end_date} · {viewingPlan.days?.length ?? 0} days
+                    {viewingPlan.start_date} â€” {viewingPlan.end_date} Â· {viewingPlan.days?.length ?? 0} days
                   </p>
                 </div>
               </div>
@@ -286,7 +291,7 @@ export default function StudyPlannerPage() {
   return (
     <div className="flex min-h-screen bg-[#F8FAFC]">
       <Sidebar />
-      <main className="ml-64 flex-1 p-8">
+      <main className="lg:ml-64 p-4 lg:p-8 pt-16 lg:pt-8">
         <div className="mx-auto max-w-4xl">
           <div className="mb-6 flex items-center justify-between">
             <div>
@@ -339,7 +344,7 @@ export default function StudyPlannerPage() {
                   {selectedSubjects.length > 0 && (
                     <div className="space-y-2">
                       <label className="block text-sm font-medium text-gray-700">
-                        Select topics per subject (optional — we&apos;ll pick the best ones if you skip this)
+                        Select topics per subject (optional â€” we&apos;ll pick the best ones if you skip this)
                       </label>
                       {selectedSubjects.map((subj) => (
                         <div key={subj} className="rounded-lg border border-gray-100 bg-gray-50/50">
@@ -452,7 +457,7 @@ export default function StudyPlannerPage() {
                     <ChevronLeft className="h-4 w-4" />
                   </Button>
                   <span className="text-sm font-normal text-gray-500">
-                    {weekDays[0].toLocaleDateString("en-NG", { month: "short", day: "numeric" })} — {weekDays[6].toLocaleDateString("en-NG", { month: "short", day: "numeric" })}
+                    {weekDays[0].toLocaleDateString("en-NG", { month: "short", day: "numeric" })} â€” {weekDays[6].toLocaleDateString("en-NG", { month: "short", day: "numeric" })}
                   </span>
                   <Button variant="ghost" size="icon" onClick={() => setWeekOffset(weekOffset + 1)}>
                     <ChevronRight className="h-4 w-4" />
@@ -508,7 +513,7 @@ export default function StudyPlannerPage() {
                           <span>{totalDays} days</span>
                           <span>{completedDays} completed</span>
                           {allSubjects.length > 0 && (
-                            <span className="text-gray-400">· {allSubjects.join(", ")}</span>
+                            <span className="text-gray-400">Â· {allSubjects.join(", ")}</span>
                           )}
                         </div>
                         <Progress value={totalDays > 0 ? (completedDays / totalDays) * 100 : 0} className="mt-2 w-48" />

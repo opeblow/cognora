@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
@@ -32,6 +32,7 @@ export default function LobbiesPage() {
     queryKey: ["lobbies"],
     queryFn: () => lobbyService.getAll(),
     enabled: isAuthenticated,
+    refetchInterval: 30000,
   })
 
   const { data: subjectsData } = useQuery({
@@ -75,7 +76,7 @@ export default function LobbiesPage() {
   return (
     <div className="flex min-h-screen bg-[#F8FAFC]">
       <Sidebar />
-      <main className="ml-64 flex-1 p-8">
+      <main className="lg:ml-64 p-4 lg:p-8 pt-16 lg:pt-8">
         <div className="mx-auto max-w-4xl">
           <div className="mb-6 flex items-center justify-between">
             <div>

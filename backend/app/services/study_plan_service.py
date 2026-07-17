@@ -98,6 +98,37 @@ class StudyPlanService:
         self.db.commit()
         return True
 
+    def _get_subject_scores(self, user_id: str, subjects: list[str]) -> dict[str, float]:
+        """Get average quiz scores per subject for adaptive weighting."""
+        from app.models.subject import Subject
+        scores: dict[str, float] = {}
+        for s_name in subjects:
+            subj = self.db.query(Subject).filter(Subject.name == s_name).first()
+            if not subj:
+                scores[s_name] = 50.0
+                continue
+            attempts = (
+                self.db.query(QuizAttempt)
+                .join(QuizAttempt.quiz)
+                .filter(
+                    QuizAttempt.user_id == user_id,
+                    QuizAttempt.quiz.has(subject_id=subj.id),
+                )
+                .order_by(QuizAttempt.created_at.desc())
+                .limit(10)
+                .all()
+            )
+            if attempts:
+                total = 0
+                for a in attempts:
+                    s = int(a.score or "0")
+                    t = int(a.total or "1")
+                    total += (s / t * 100) if t > 0 else 0
+                scores[s_name] = total / len(attempts)
+            else:
+                scores[s_name] = 50.0
+        return scores
+
     def _scheduling_algorithm(
         self,
         subjects: list[str],
@@ -105,6 +136,7 @@ class StudyPlanService:
         end_date: date,
         hours_per_day: float,
         subject_topics: dict[str, list[str]] = None,
+        subject_weights: dict[str, float] = None,
     ) -> list[dict]:
         """Create a realistic daily study timetable with breaks.
 
@@ -122,15 +154,20 @@ class StudyPlanService:
         total_available_minutes = int(hours_per_day * 60)
         block_minutes = 45
         break_minutes = 10
-        revision_weight = 3
+
+        weights = subject_weights or {s: 1.0 for s in subjects}
+        max_w = max(weights.values()) if weights else 1.0
+        normalized = {s: max(0.5, weights[s] / max_w) for s in weights}
 
         topic_queue = []
         for subj in subjects:
             topics = (subject_topics or {}).get(subj, [])
             if not topics:
                 topics = [f"{subj} — Core Concepts"]
-            for t in topics:
-                topic_queue.append({"subject": subj, "topic": t, "is_revision": False})
+            repeat = max(1, int(normalized.get(subj, 1.0) * 3))
+            for _ in range(repeat):
+                for t in topics:
+                    topic_queue.append({"subject": subj, "topic": t, "is_revision": False})
 
         if not topic_queue:
             topic_queue = [{"subject": subjects[0], "topic": f"{subjects[0]} — Core Concepts", "is_revision": False}]
@@ -287,12 +324,18 @@ class StudyPlanService:
             is_active="true",
         )
 
+        subject_scores = self._get_subject_scores(user_id, subjects)
+        subject_weights = {}
+        for s_name, score in subject_scores.items():
+            subject_weights[s_name] = max(0.5, (100 - score) / 100 * 2)
+
         daily_tasks = self._scheduling_algorithm(
             subjects=subjects,
             start_date=start_date,
             end_date=end_date,
             hours_per_day=hours_per_day,
             subject_topics=subject_topics,
+            subject_weights=subject_weights,
         )
 
         for task in daily_tasks:
