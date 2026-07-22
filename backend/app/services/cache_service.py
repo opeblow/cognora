@@ -13,7 +13,7 @@ async def get_redis():
 def make_cache_key(prefix: str, *args, **kwargs) -> str:
     key = f"{prefix}:{':'.join(str(a) for a in args)}"
     if kwargs:
-        key += f":{hashlib.md5(json.dumps(kwargs, sort_keys=True).encode()).hexdigest()}"
+        key += f":{hashlib.sha256(json.dumps(kwargs, sort_keys=True).encode()).hexdigest()}"
     return key
 
 
@@ -56,7 +56,9 @@ def cached(ttl: int = 300):
     def decorator(func):
         @functools.wraps(func)
         async def wrapper(*args, **kwargs):
-            key_args = args[1:] if args and hasattr(args[0], '__dict__') else args
+            first_arg = args[0] if args else None
+            is_method = first_arg is not None and not isinstance(first_arg, (str, int, float, bool, list, dict, set, tuple))
+            key_args = args[1:] if is_method else args
             cache_key = make_cache_key(func.__name__, *key_args, **kwargs)
             cached_value = await get_cached(cache_key)
             if cached_value is not None:

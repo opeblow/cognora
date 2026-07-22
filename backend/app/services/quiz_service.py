@@ -1,3 +1,4 @@
+import asyncio
 import concurrent.futures
 import json
 import random
@@ -135,20 +136,23 @@ class QuizService:
         return all_questions[:count]
 
     async def get_quiz_detail(self, quiz_id: str, user_id: str) -> dict:
-        quiz = self.quiz_repo.get_with_questions(quiz_id)
+        quiz = await asyncio.to_thread(self.quiz_repo.get_with_questions, quiz_id)
         if not quiz:
             raise ValueError("Quiz not found")
 
-        target_count = 10
+        target_count = 60
         subject_id = str(quiz.subject_id)
-        subject = self.subject_repo.get(subject_id)
+        subject = await asyncio.to_thread(self.subject_repo.get, subject_id)
 
-        topics = [
-            t.title for t in self.db.query(Topic)
-            .join(Topic.lesson)
-            .filter(Topic.lesson.has(subject_id=subject_id))
-            .all()
-        ]
+        def _get_topics():
+            return [
+                t.title for t in self.db.query(Topic)
+                .join(Topic.lesson)
+                .filter(Topic.lesson.has(subject_id=subject_id))
+                .all()
+            ]
+
+        topics = await asyncio.to_thread(_get_topics)
 
         raw_questions = await self._generate_questions_for_session(
             subject_name=subject.name if subject else "",
@@ -157,7 +161,7 @@ class QuizService:
         )
 
         random.shuffle(raw_questions)
-        selected = raw_questions[:target_count]
+        selected = raw_questions
 
         for i, q in enumerate(selected):
             q["order_index"] = i + 1

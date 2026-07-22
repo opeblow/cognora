@@ -11,4 +11,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
+RUN addgroup --system --gid 1001 app && \
+    adduser --system --uid 1001 app && \
+    chown -R app:app /app
+
+USER app
+
 CMD ["celery", "-A", "app.workers.celery_app", "worker", "--loglevel=info"]

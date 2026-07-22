@@ -23,11 +23,13 @@ def reset_weekly_credits():
             .where(User.weekly_credits_reset_at <= now)
             .values(
                 weekly_credits_used=0,
-                weekly_credits_reset_at=now + timedelta(days=7)
+                weekly_credits_reset_at=now + timedelta(days=7),
+                credits=User.credits + settings.FREE_WEEKLY_CREDITS,
             )
         )
-        db.execute(stmt)
+        result = db.execute(stmt)
         db.commit()
+        logger.info(f"Successfully reset weekly credits for {result.rowcount} users")
     except Exception as e:
         logger.error(f"Failed to reset weekly credits: {e}")
         db.rollback()

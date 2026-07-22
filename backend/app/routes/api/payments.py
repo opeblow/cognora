@@ -60,7 +60,7 @@ async def handle_webhook(request: Request, db: Session = Depends(get_db)):
     if not secret:
         logger.error("PAYSTACK_SECRET_KEY is not configured — webhook validation disabled")
         raise HTTPException(status_code=500, detail="Webhook secret not configured")
-    expected = hmac.new(secret.encode(), raw_body, hashlib.sha512).hexdigest()
+    expected = hmac.new(secret.encode(), raw_body, digestmod=hashlib.sha512).hexdigest()
     if not signature or not hmac.compare_digest(signature, expected):
         raise HTTPException(status_code=401, detail="Invalid webhook signature")
     try:

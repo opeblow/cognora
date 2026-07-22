@@ -15,7 +15,7 @@ from app.middleware.prometheus import PrometheusMiddleware
 from app.core.sentry import init_sentry
 from app.routes.api import auth, subjects, ai, quizzes, exams, dashboard, credits, lessons, textbook, study_planner, analytics as analytics_router, settings as settings_router, upload, audio, live, gamification, lobby, flashcard, payments, issues, content, study_groups, past_questions
 from app.database.base import engine
-from app.database.redis import get_redis
+from app.database.redis import get_redis, close_redis
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +41,11 @@ async def lifespan(app: FastAPI):
         logger.warning(f"Database connection failed on startup: {e}")
     logger.info(f"Startup checks — DB: {'OK' if db_ok else 'FAIL'}, Redis: {'OK' if redis_ok else 'FAIL'}")
     yield
+    try:
+        await close_redis()
+        logger.info("Redis connections closed on shutdown")
+    except Exception as e:
+        logger.warning(f"Error closing Redis connections on shutdown: {e}")
 
 
 def create_app() -> FastAPI:

@@ -175,17 +175,12 @@ class GamificationService:
     def _check_badges(self, user: User) -> list[str]:
         awarded = []
         badges = self.db.query(Badge).all()
+        existing_badge_ids = set(
+            r[0] for r in self.db.query(UserBadge.badge_id).filter(UserBadge.user_id == user.id).all()
+        )
 
         for badge in badges:
-            already = (
-                self.db.query(UserBadge)
-                .filter(
-                    UserBadge.user_id == user.id,
-                    UserBadge.badge_id == badge.id,
-                )
-                .first()
-            )
-            if already:
+            if badge.id in existing_badge_ids:
                 continue
 
             met = False

@@ -94,27 +94,35 @@ class NullPipeline:
         return [0, 0, 0, True]
 
 
+import asyncio
+
 _client = None
+_init_lock = None
 
 
 async def get_redis():
-    global _client
+    global _client, _init_lock
     if _client is not None:
         return _client
-    redis_url = settings.cache_redis_url
-    if not redis_url:
-        logger.info("REDIS_URL not set, using in-memory fallback")
-        _client = NullRedis()
+    if _init_lock is None:
+        _init_lock = asyncio.Lock()
+    async with _init_lock:
+        if _client is not None:
+            return _client
+        redis_url = settings.cache_redis_url
+        if not redis_url:
+            logger.info("REDIS_URL not set, using in-memory fallback")
+            _client = NullRedis()
+            return _client
+        try:
+            c = aioredis.from_url(redis_url, decode_responses=True)
+            await c.ping()
+            _client = c
+            logger.info("Connected to Redis")
+        except Exception as e:
+            logger.warning(f"Redis unavailable ({e}), using in-memory fallback")
+            _client = NullRedis()
         return _client
-    try:
-        c = aioredis.from_url(redis_url, decode_responses=True)
-        await c.ping()
-        _client = c
-        logger.info("Connected to Redis")
-    except Exception as e:
-        logger.warning(f"Redis unavailable ({e}), using in-memory fallback")
-        _client = NullRedis()
-    return _client
 
 
 async def close_redis():

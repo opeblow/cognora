@@ -1,10 +1,13 @@
 import time
 import logging
+import re
 from prometheus_client import Counter, Histogram, Gauge, generate_latest, CONTENT_TYPE_LATEST
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 
 logger = logging.getLogger(__name__)
+
+UUID_PATTERN = re.compile(r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
 
 REQUEST_COUNT = Counter(
     "cognora_http_requests_total",
@@ -100,9 +103,7 @@ class PrometheusMiddleware(BaseHTTPMiddleware):
         parts = path.strip("/").split("/")
         normalized = []
         for part in parts:
-            if part.isdigit() or (
-                len(part) > 8 and part[0] in ("a", "b", "c", "d", "e", "f") and "-" in part
-            ):
+            if part.isdigit() or UUID_PATTERN.match(part) or (len(part) >= 20 and "-" in part):
                 normalized.append("{id}")
             else:
                 normalized.append(part)

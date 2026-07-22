@@ -1,3 +1,4 @@
+import asyncio
 import json
 import random
 import hashlib
@@ -68,14 +69,14 @@ class ExamService:
 
     async def start_exam_async(self, exam_id: str, user_id: str) -> dict:
         """Async version with live question generation via Brave API."""
-        exam = self.exam_repo.get_with_questions(exam_id)
+        exam = await asyncio.to_thread(self.exam_repo.get_with_questions, exam_id)
         if not exam:
             raise ValueError("Exam not found")
 
-        in_progress = self.exam_result_repo.get_in_progress(user_id, exam_id)
+        in_progress = await asyncio.to_thread(self.exam_result_repo.get_in_progress, user_id, exam_id)
         if in_progress:
             result_id = str(in_progress.id)
-            questions = self._get_existing_questions(exam, result_id)
+            questions = await asyncio.to_thread(self._get_existing_questions, exam, result_id)
             is_new = False
         else:
             standards = EXAM_TYPE_STANDARDS.get(exam.exam_type, JAMB_STANDARDS)
@@ -165,12 +166,15 @@ class ExamService:
         subject_name = subject.name if subject else "General"
         exam_type = exam.exam_type
 
-        topics = (
-            self.db.query(Topic)
-            .join(Topic.lesson)
-            .filter(Lesson.subject_id == exam.subject_id)
-            .all()
-        )
+        def _get_topics():
+            return (
+                self.db.query(Topic)
+                .join(Topic.lesson)
+                .filter(Lesson.subject_id == exam.subject_id)
+                .all()
+            )
+
+        topics = await asyncio.to_thread(_get_topics)
         topic_names = [t.title for t in topics] if topics else [subject_name]
 
         rng = random.Random(f"{user_id}:{exam.id}")
